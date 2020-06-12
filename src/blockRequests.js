@@ -62,6 +62,7 @@ function handleHeadersReceived(details) {
     }
 
     request = state.requests[requestId];
+
     if(request.tracker) {
         if(responseHeaders = stripHeaders(details.responseHeaders, 'set-cookie')) {
             request.isBlocked = true;
@@ -89,6 +90,8 @@ function endRequest(details) {
         console.log('blocked ' + request.url, state.totalCount);
         setBadgeText(state.totalCount.toString());
     }
+
+    delete state.requests[requestId];
 }
 
 function handleError(details) {
