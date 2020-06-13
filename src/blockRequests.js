@@ -1,6 +1,5 @@
 import asTracker from './tracker.js';
 import state from './state_provider.js';
-import setBadgeText from './ui.js';
 
 function beginRequest(details) {
     const { tabId, requestId } = details;
@@ -86,9 +85,9 @@ function endRequest(details) {
 
     if (request.isBlocked) {
         // TODO: emit blocked event here
-        state.totalCount += 1;
-        console.log('blocked ' + request.url, state.totalCount);
-        setBadgeText(state.totalCount.toString());
+        //state.totalCount += 1;
+        //console.log('blocked ' + request.url, state.totalCount);
+        //setBadgeText(state.totalCount.toString());
     }
 
     delete state.requests[requestId];
@@ -97,13 +96,9 @@ function endRequest(details) {
 function handleError(details) {
     const { tabId, requestId } = details;
 
-    //var request;
-
     if (!state.requests.hasOwnProperty(requestId)) {
         return;
     }
-
-    //request = state.requests[requestId];
 
     if(details.error) {
         console.warn('Encountered error: ' + error, error);

@@ -4,7 +4,8 @@
 process.env.CHROME_BIN = require('puppeteer').executablePath()
 
 // TODO: externalize this as my Gentoo box requires it but not MacOSX
-process.env.FIREFOX_BIN = "/usr/bin/firefox-bin"
+//process.env.FIREFOX_BIN = "/usr/bin/firefox-bin"
+// e.g. env FIREFOX_BIN=/usr/bin/firefox-bin npm run test:firefox
 
 module.exports = function(config) {
     config.set({
