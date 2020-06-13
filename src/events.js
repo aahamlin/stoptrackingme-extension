@@ -32,6 +32,7 @@ export function addListener(listener) {
     listeners.push(listener);
 }
 
-export function removeListener(listener) {
-
+export function reset() {
+    events.splice(0);
+    listeners.splice(0);
 }

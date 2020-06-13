@@ -1,8 +1,7 @@
-import { configure, clear_all } from '../src/tracker.js';
-
-// TODO add other imports
 import testData from './testData.js';
+import { configure, clear_all } from '../src/tracker.js';
 import state, { reset as resetState } from '../src/state_provider.js';
+import { addListener, reset as resetEvents } from '../src/events.js';
 import { beginRequest,
          handleSendHeaders,
          handleHeadersReceived,
@@ -52,6 +51,7 @@ describe('blockRequests', function () {
     afterEach(function () {
         clear_all();
         resetState();
+        resetEvents();
     });
 
     it('#beginRequest() stores requestId in state', function() {
@@ -68,6 +68,17 @@ describe('blockRequests', function () {
         endRequest(detailsOfTracker);
         expect(state.requests).to.not.have.property(detailsOfTracker.requestId);
         expect(state.requests).to.have.property(detailsOfNonTracker.requestId);
+    });
+
+    it('#endRequest emits blockedCookie event', function (done) {
+        addListener(function (eventObj) {
+            expect(eventObj.type).to.be.equal('blockedCookie');
+            done();
+        });
+
+        beginRequest(detailsOfTracker);
+        handleHeadersReceived(detailsOfTracker);
+        endRequest(detailsOfTracker);
     });
 
     it('#handleError() removes requestId from state', function () {

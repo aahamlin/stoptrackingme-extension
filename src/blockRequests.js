@@ -1,5 +1,6 @@
 import asTracker from './tracker.js';
 import state from './state_provider.js';
+import { createEvent, send } from './events.js';
 
 function beginRequest(details) {
     const { tabId, requestId } = details;
@@ -88,6 +89,10 @@ function endRequest(details) {
         //state.totalCount += 1;
         //console.log('blocked ' + request.url, state.totalCount);
         //setBadgeText(state.totalCount.toString());
+        send(createEvent('blockedCookie', Object.assign({
+            tabId: tabId
+        }, request)));
+
     }
 
     delete state.requests[requestId];

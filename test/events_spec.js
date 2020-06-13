@@ -1,4 +1,4 @@
-import { createEvent, send, addListener, removeListener } from '../src/events.js';
+import { createEvent, send, addListener, reset } from '../src/events.js';
 
 
 describe('events', function () {
@@ -12,9 +12,12 @@ describe('events', function () {
         }
     };
 
+    afterEach(function () {
+        reset();
+    });
+
     it('#createEvent() creates event', function () {
         var evt = createEvent('blockedCookie', evtObj);
-
         expect(evt).to.have.property('type', 'blockedCookie');
         expect(evt).to.have.deep.nested.property('data', evtObj);
     });
@@ -36,7 +39,6 @@ describe('events', function () {
         };
 
         var evt = createEvent('blockedCookie', evtObj);
-
         addListener(listenerFn);
         send(evt);
     });
