@@ -1,49 +1,100 @@
 /* setup the extension module */
 import browser from './browser.js';
-import fetch from './fetch.js';
-import toConfig from './loadTrackers.js';
-import { configure } from './tracker.js';
-import * as Block from './blockRequests.js';
+import { initTrackingServices } from './services.js';
+import * as RequestHandler from './requestHandler.js';
+
+import state, { eventStream, errorStream } from './state_provider.js';
+import showTotal from './ui.js';
 
 const netFilters = {
     urls: ['https://*/*', 'http://*/*'],
 };
 
-// get extension configuration
-fetch(browser.extension.getURL('config/services.json'),
-      function(err, text) {
-          if (err){
-              console.error('Failed to get the configuration: ' + err);
-          } else {
-              configure(toConfig(JSON.parse(text)));
-          }
-      });
+initTrackingServices().then(function (trackingServices) {
 
-// register listeners
-browser.webRequest.onStartRequest.addListener(
-    Block.beginRequest,
-    netFilters
-);
+    RequestHandler.registerTrackingServices(trackingServices);
 
-browser.webRequest.onBeforeSendHeaders.addListener(
-    Block.handleSendHeaders,
-    netFilters,
-    ['blocking', 'requestHeaders', 'extraHeaders']
-);
+    browser.tabs.query({}, function (tabs) {
+        for(let i=0; i < tabs.length; i++) {
+            RequestHandler.addTab({tabId: tabs[i].id});
+            //RequestHandler.updateTab(tabs[i].id, { url: tabs[i].url }, tabs[i]);
+        }
+    });
 
-browser.webRequest.onHeadersReceived.addListener(
-    Block.handleHeadersReceived,
-    netFilters,
-    ['blocking', 'responseHeaders', 'extraHeaders']
-);
+    browser.tabs.onActivated.addListener(RequestHandler.addTab);
+    //browser.tabs.onUpdated.addListener(RequestHandler.updateTab);
+    browser.tabs.onRemoved.addListener(RequestHandler.removeTab);
+    browser.tabs.onReplaced.addListener(RequestHandler.replaceTab);
+
+    browser.webRequest.onBeforeRequest.addListener(
+        RequestHandler.beginRequest,
+        netFilters,
+        ['blocking']
+    );
+
+    try {
+        browser.webRequest.onBeforeSendHeaders.addListener(
+            RequestHandler.handleSendHeaders,
+            netFilters,
+            ['blocking', 'requestHeaders', 'extraHeaders']
+        );
+    }
+    catch (e) {
+        // firefox does not support extraHeaders, while chrome requires them
+        browser.webRequest.onBeforeSendHeaders.addListener(
+            RequestHandler.handleSendHeaders,
+            netFilters,
+            ['blocking', 'requestHeaders']
+        );
+    }
+
+    try {
+        browser.webRequest.onHeadersReceived.addListener(
+            RequestHandler.handleHeadersReceived,
+            netFilters,
+            ['blocking', 'responseHeaders', 'extraHeaders']
+        );
+    }
+    catch (e) {
+        // firefox does not support extraHeaders, while chrome requires them
+        browser.webRequest.onHeadersReceived.addListener(
+            RequestHandler.handleHeadersReceived,
+            netFilters,
+            ['blocking', 'responseHeaders']
+        );
+    }
 
 
-browser.webRequest.onCompleted.addListener(
-    Block.endRequest,
-    netFilters
-);
+    browser.webRequest.onCompleted.addListener(
+        RequestHandler.endRequest,
+        netFilters
+    );
 
-browser.webRequest.onErrorOccurred.addListener(
-    Block.handleError,
-    netFilters
-);
+    browser.webRequest.onErrorOccurred.addListener(
+        RequestHandler.handleError,
+        netFilters
+    );
+
+});
+
+// TODO: move stream listener into relevant ui and history modules
+eventStream.listen(function(event) {
+    const { type, data } = event;
+    // TODO: store history
+    if (type === 'blockedTrackingService') {
+        if(!state.hasOwnProperty(data.tabId)) {
+            return;
+        }
+        state[data.tabId].totalCount += 1;
+        showTotal(state[data.tabId].totalCount.toString(),
+                  data.tabId);
+    }
+    else  {
+        console.log(type, data);
+    }
+});
+
+errorStream.listen(function(err) {
+    const { data } = err;
+    console.warn('Error occurred:' + data);
+});

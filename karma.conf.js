@@ -22,7 +22,7 @@ module.exports = function(config) {
         // list of files / patterns to load in the browser
         files: [
             'test/globals.js',
-            { pattern: 'test/*[Dd]ata.js', type: 'module' },
+            { pattern: 'test/helpers/*.js', type: 'module' },
 	        { pattern: 'test/**/*[Ss]pec.js', type: 'module'},
             { pattern: 'src/**/*.js', type: 'module', included: false },
         ],

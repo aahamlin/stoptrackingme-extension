@@ -1,6 +1,6 @@
 import browser from './browser.js';
 
-export default function(str, tabId) {
+export function showTotal(str, tabId) {
     var data = { text: str };
     if(tabId) {
         Object.assign(data, { tabId: tabId });
@@ -9,3 +9,6 @@ export default function(str, tabId) {
         .browserAction
         .setBadgeText(data);
 };
+
+
+export { showTotal as default };

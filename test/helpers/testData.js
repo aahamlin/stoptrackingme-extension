@@ -1,4 +1,4 @@
-const services = {
+export const services = {
     "categories": {
         "Advertising": [
             {
@@ -53,28 +53,4 @@ const services = {
     }
 };
 
-
-const config = {
-    trackers: {
-        '63squares.com': {
-            category: 'Analytics',
-            name: '63 Squares',
-            url: 'http://63squares.com'
-        },
-        'activeengage.com': {
-            category: 'Content',
-            name: 'ActiveEngage',
-            url: 'http://www.activeengage.com'
-        },
-        'tracker.somewhere.com': {
-            category: 'Fingerprinting',
-            name: 'Somewhere Fake',
-            url: 'http://www.somewhere.com'
-        }
-    }
-};
-
-export default {
-    services: services,
-    config: config
-};
+export { services as default };

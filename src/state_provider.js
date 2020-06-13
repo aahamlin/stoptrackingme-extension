@@ -1,12 +1,9 @@
-const state = {
-    requests: {},
-    totalCount: 0,
-};
+import { Stream } from './streams.js';
 
-
-export function reset() {
-    state.requests = {};
-    state.totalCount = 0;
-}
+const state = {};
 
 export { state as default };
+
+export const eventStream = Stream();
+
+export const errorStream = Stream();
