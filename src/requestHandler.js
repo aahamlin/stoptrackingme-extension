@@ -16,6 +16,7 @@ const services = {};
  * @param @object containing service definitions.
  */
 export function registerTrackingServices(trackingServices) {
+    // TODO add flag to clear old services
     for(let old in services) { delete services[old]; }
     for(let service in trackingServices) {
         services[service] = trackingServices[service];
@@ -33,24 +34,6 @@ export function addTab(info) {
         };
     }
 }
-
-// export function updateTab(tabId, info, tab) {
-//     console.log('updated ' + tabId, info);
-//     if(!state.hasOwnProperty(tabId)) {
-//         return;
-//     }
-
-//     if (info.status) {
-//         console.log('tabId ' + tabId + ' status = ' + tab.status, info);
-//     }
-
-//     if(info.url) {
-//         state[tabId].siteName = getDomain(tab.url);
-//     }
-//     else if (info.pendingUrl) {
-//         state[tabId].siteName = getDomain(tab.pendingUrl);
-//     }
-// }
 
 export function removeTab(tabId, info) {
     if(state.hasOwnProperty(tabId)) {
@@ -92,6 +75,7 @@ export function beginRequest(details) {
         blockCookies: false
     };
 
+    // move service handling to helper function
     const serviceId = lookup(services, requestDomain);
 
     if (serviceId) {
@@ -104,6 +88,7 @@ export function beginRequest(details) {
             request.cancelled = true;
         }
     }
+    // move third-party cookie handling to send,recv headers 
     else if (pageDomain !== requestDomain) {
         request.blockCookies = true;
         console.log('blocking third-party cookies b/c ' + requestDomain

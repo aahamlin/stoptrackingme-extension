@@ -11,18 +11,15 @@ const netFilters = {
 };
 
 initTrackingServices().then(function (trackingServices) {
-
     RequestHandler.registerTrackingServices(trackingServices);
 
     browser.tabs.query({}, function (tabs) {
         for(let i=0; i < tabs.length; i++) {
             RequestHandler.addTab({tabId: tabs[i].id});
-            //RequestHandler.updateTab(tabs[i].id, { url: tabs[i].url }, tabs[i]);
         }
     });
 
     browser.tabs.onActivated.addListener(RequestHandler.addTab);
-    //browser.tabs.onUpdated.addListener(RequestHandler.updateTab);
     browser.tabs.onRemoved.addListener(RequestHandler.removeTab);
     browser.tabs.onReplaced.addListener(RequestHandler.replaceTab);
 

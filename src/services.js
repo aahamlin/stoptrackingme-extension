@@ -9,8 +9,8 @@ export function lookup(services, servername) {
     if(!services || services.length) throw new Error('provide services object');
     if(!servername || typeof servername !== 'string') throw new Error('provide servername string');
     // how these map to service definitions:
-    // key: twitter.jp => { url: https://twitter.com }
-    // key: twitter.com => { url: https://twitter.com }
+    // key: twitter.jp => { url: https://twitter.com, category: string }
+    // key: twitter.com => { url: https://twitter.com, category: string }
 
     // move from top-level domain backwards
     var index = servername.lastIndexOf('.'),
