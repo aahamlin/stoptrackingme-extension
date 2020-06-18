@@ -1,7 +1,8 @@
-module Main exposing (Model, Msg(..), init, main, subscriptions, update, view)
+port module Main exposing (main)
 
 import Browser
 import Html exposing (..)
+import Json.Decode as Decode exposing (Decoder, Error(..), Value, decodeValue)
 
 
 main : Program () Model Msg
@@ -14,36 +15,109 @@ main =
         }
 
 
-type Model
-    = Start
+type alias Model =
+    { categories : List Category
+    , error : Maybe Error
+    }
+
+
+type alias Category =
+    { name : String
+    , count : Int
+    }
+
+
+emptyHistory =
+    { categories = []
+    , error = Nothing
+    }
 
 
 init : () -> ( Model, Cmd Msg )
 init _ =
-    ( Start, Cmd.none )
+    ( emptyHistory, Cmd.none )
 
 
 type Msg
-    = Msg1
-    | Msg2
+    = GotHistoryMsg Value
 
+categoriesDecoder : Decoder (List Category)
+categoriesDecoder =
+    Decode.list categoryDecoder
+
+categoryDecoder : Decoder Category
+categoryDecoder =
+    Decode.map2 Category
+        (Decode.field "name" Decode.string)
+        (Decode.field "count" Decode.int)
 
 update : Msg -> Model -> ( Model, Cmd Msg )
 update msg model =
     case msg of
-        Msg1 ->
-            ( model, Cmd.none )
+        GotHistoryMsg value ->
+            case decodeValue categoriesDecoder value of
+                Ok data ->
+                    ( { model | categories = data }, Cmd.none )
 
-        Msg2 ->
-            ( model, Cmd.none )
+                Err error ->
+                    ( { model | error = Just error }, Cmd.none )
 
 
 subscriptions : Model -> Sub Msg
-subscriptions model =
-    Sub.none
+subscriptions _ =
+    onHistoryChange GotHistoryMsg
+
+
+port onHistoryChange : (Value -> msg) -> Sub msg
 
 
 view : Model -> Html Msg
 view model =
     div []
-        [ text "New Element" ]
+        [ p [] [ text "History" ]
+        , viewHistoryOrError model
+        ]
+
+
+viewHistoryOrError : Model -> Html Msg
+viewHistoryOrError model =
+    case model.error of
+        Just error ->
+            viewError error
+
+        Nothing ->
+            viewHistory model.categories
+
+
+viewError : Error -> Html Msg
+viewError error =
+    let
+        errorHeading =
+            "Failed to read event history"
+
+        errorMessage =
+            case error of
+                Failure message _ ->
+                    message
+
+                _ ->
+                    "Error: invalid JSON"
+    in
+    div []
+        [ h3 [] [ text errorHeading ]
+        , text ("Error: " ++ errorMessage)
+        ]
+
+
+viewHistory : List Category -> Html Msg
+viewHistory categories =
+    ul []
+        (List.map viewCategory categories)
+
+
+viewCategory : Category -> Html Msg
+viewCategory category =
+    div []
+        [ div [] [ text category.name ]
+        , div [] [ text (String.fromInt category.count) ]
+        ]
