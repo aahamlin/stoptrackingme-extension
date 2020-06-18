@@ -6,6 +6,7 @@ import {
     registerTrackingServices,
     registerEventSinks,
     addTab,
+    updateTab,
     removeTab,
     replaceTab,
     beginRequest,
@@ -53,17 +54,6 @@ describe('requestHandler', function () {
         ]
     };
 
-
-    function updateState(newState) {
-        for(let tabId in newState) {
-            if (!state.hasOwnProperty(tabId)) {
-                state[tabId] = {};
-            }
-            state[tabId] = testUtils.copy(state[tabId],
-                                          newState[tabId]);
-        }
-    }
-
     beforeEach(function () {
         registerTrackingServices(
             configureServices(testData));
@@ -74,10 +64,11 @@ describe('requestHandler', function () {
 
         registerEventSinks({add: eventSpy}, {add:errorSpy});
 
-        updateState({
+        testUtils.updateState(state, {
             '1': {
                 requests: {},
-                totalCount: 0
+                totalCount: 0,
+                pageDomain: 'https://www.initiator.com/',
             }
         });
     });
@@ -94,13 +85,20 @@ describe('requestHandler', function () {
         expect(state).to.have.property('2');
     });
 
+    it('#updateTab sets state#pageDomain', function() {
+        //'https://www.initiator.com/'
+        var tabInfo = { url: 'https://www.changedurl.com' };
+        updateTab(1, tabInfo, tabInfo);
+        expect(state[1]).to.have.property('pageDomain', 'www.changedurl.com');
+    });
+
     it('#removeTab removes state[tabId]', function() {
         removeTab(1);
         expect(state.hasOwnProperty(1)).to.be.false;
     });
 
     it('#replaceTab() stores state under new id', function () {
-        updateState({
+        testUtils.updateState(state, {
             1: {
                 requests: {
                     132: {
@@ -116,9 +114,17 @@ describe('requestHandler', function () {
         expect(state).to.not.have.property('1');
     });
 
+    it('#beginRequest() updates state#pageDomain', function() {
+        var details = testUtils.copy({}, detailsOfNonTracker);
+        details.initiator = undefined;
+        beginRequest(details);
+        expect(state[detailsOfTracker.tabId]).to.have.property('pageDomain', 'www.safeurl.com');
+    });
+
+
     it('#beginRequest() stores requestId in state', function() {
-        beginRequest(detailsOfTracker);
-        expect(state[detailsOfTracker.tabId].requests).to.have.property(detailsOfTracker.requestId);
+        beginRequest(detailsOfNonTracker);
+        expect(state[detailsOfNonTracker.tabId].requests).to.have.property(detailsOfNonTracker.requestId);
     });
 
     it('#beginRequest() cancels third-party tracking service request', function () {
@@ -146,7 +152,7 @@ describe('requestHandler', function () {
     });
 
     it('#handleSendHeaders() removes third-party cookies', function() {
-        updateState({
+        testUtils.updateState(state, {
             1: {
                 requests: {
                     127: {
@@ -167,7 +173,7 @@ describe('requestHandler', function () {
         var details = testUtils.copy({}, detailsOfTracker);
         details.initiator = undefined; //'http://63squares.com';
 
-        updateState({
+        testUtils.updateState(state,{
             1: {
                 requests: {
                     132: {
@@ -185,7 +191,7 @@ describe('requestHandler', function () {
         details.initiator = 'http://63squares.com';
         details.url = 'https://www.i-stats.com/service';
 
-        updateState({
+        testUtils.updateState(state,{
             1: {
                 requests: {
                     132: {
@@ -201,7 +207,7 @@ describe('requestHandler', function () {
 
 
     it('#handleHeadersReceived() removes third-party set-cookies', function() {
-        updateState({
+        testUtils.updateState(state,{
             1: {
                 requests: {
                     127: {
@@ -226,7 +232,7 @@ describe('requestHandler', function () {
     it('#handleHeadersReceived() does not remove first-party set-cookies', function() {
         var details = testUtils.copy({}, detailsOfTracker);
         details.initiator = undefined; //'http://63squares.com';
-        updateState({
+        testUtils.updateState(state,{
             1: {
                 requests: {
                     132: {
@@ -244,7 +250,7 @@ describe('requestHandler', function () {
         var details = testUtils.copy({}, detailsOfTracker);
         details.initiator = 'http://63squares.com';
         details.url = 'https://www.i-stats.com/service';
-        updateState({
+        testUtils.updateState(state,{
             1: {
                 requests: {
                     132: {
@@ -272,7 +278,7 @@ describe('requestHandler', function () {
             siteName: 'www.safeurl.com'
         };
 
-        updateState({ 1: { requests: reqState } });
+        testUtils.updateState(state,{ 1: { requests: reqState } });
         endRequest(detailsOfTracker);
         expect(state[detailsOfTracker.tabId].requests).to.not.have.property(detailsOfTracker.requestId);
         expect(state[detailsOfNonTracker.tabId].requests).to.have.property(detailsOfNonTracker.requestId);
@@ -281,7 +287,7 @@ describe('requestHandler', function () {
 
     it('#endRequest emits blocked cookie event', function () {
         var startTime = Date.now();
-        updateState({
+        testUtils.updateState(state,{
             1: {
                 requests: {
                     127: {
@@ -312,7 +318,7 @@ describe('requestHandler', function () {
             siteName: 'www.safeurl.com'
         };
 
-        updateState({ 1: { requests: reqState } });
+        testUtils.updateState(state,{ 1: { requests: reqState } });
         handleError(detailsOfTracker);
         expect(state[detailsOfTracker.tabId].requests).to.not.have.property(detailsOfTracker.requestId);
         expect(state[detailsOfNonTracker.tabId].requests).to.have.property(detailsOfNonTracker.requestId);
@@ -320,7 +326,7 @@ describe('requestHandler', function () {
 
     it('#handleError emits blocked tracker event', function () {
         var startTime = Date.now();
-        updateState({
+        testUtils.updateState(state,{
             1: {
                 requests: {
                     132: {
@@ -347,7 +353,7 @@ describe('requestHandler', function () {
             siteName: '1234.g.63squares.com'
         };
 
-        updateState({ 1: { requests: reqState } });
+        testUtils.updateState(state,{ 1: { requests: reqState } });
         handleError(errorDetails);
 
         expect(errorSpy.calledOnce).to.be.true;

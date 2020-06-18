@@ -42,7 +42,19 @@ export function addTab(info) {
     }
 }
 
-export function removeTab(tabId, info) {
+export function updateTab(tabId, info, tab) {
+    if (!state.hasOwnProperty(tabId)) {
+        return;
+    }
+
+    if (info.url) {
+        if (!fuzzyContains(tab.url, state[tabId].pageDomain)) {
+            state[tabId].pageDomain = getDomain(tab.url);
+        }
+    }
+}
+
+export function removeTab(tabId, _) {
     if(state.hasOwnProperty(tabId)) {
         delete state[tabId];
     }
@@ -58,30 +70,34 @@ export function replaceTab(newTabId, oldTabId) {
 export function beginRequest(details) {
     const { tabId, requestId } = details;
 
-    // shouldn't re-enter, but place holder for tabId handling
     if (!state.hasOwnProperty(tabId)) {
         return;
     }
 
-    var requestDomain = getDomain(details.url);
+    var requestedDomain = getDomain(details.url);
+
+    if (!details.initiator || details.initiator === 'null') {
+        state[tabId].pageDomain = requestedDomain;
+        //console.warn('switched pageDomain to ' + requestedDomain + ' because initator is empty or "null"', details.initator);
+    }
 
     var request = {
         tabId: tabId,
         requestId: requestId,
         startTime: details.timeStamp,
-        siteName: requestDomain,
-        blockCookies: false
+        siteName: requestedDomain
     };
 
-    // request domain === initiator domain
-    request.isFirstPartyRequest = isFirstPartyRequest(request.siteName, details.initiator);
+    // request domain === page domain
+    request.isFirstPartyRequest = isFirstPartyRequest(request.siteName,
+                                                      state[tabId].pageDomain);
 
-    // move service handling to helper function
-    const serviceId = lookup(services, requestDomain);
+    const serviceId = lookup(services, requestedDomain);
 
     if (serviceId) {
         request.serviceId = serviceId;
-        request.isAllowedServiceRequest = isAllowedServiceRequest(serviceId, details.initiator);
+        request.isAllowedServiceRequest = isAllowedServiceRequest(serviceId,
+                                                                  state[tabId].pageDomain/* details.initiator*/);
         // don't block service requests or their cookies when first-party is the same service
         if (!request.isAllowedServiceRequest) {
             request.cancelled = true;
@@ -102,10 +118,6 @@ export function handleSendHeaders(details) {
 
     if (!state.hasOwnProperty(tabId)
         || !state[tabId].requests.hasOwnProperty(requestId)) {
-        return;
-    }
-
-    if (!details.hasOwnProperty('requestHeaders')) {
         return;
     }
 
@@ -133,15 +145,12 @@ export function handleHeadersReceived(details) {
         return;
     }
 
-    if (!details.hasOwnProperty('responseHeaders')) {
-        return;
-    }
-
     request = state[tabId].requests[requestId];
 
     if(!opts_allowThirdPartyCookies
        && !request.isFirstPartyRequest
        && !request.isAllowedServiceRequest) {
+
         if(responseHeaders = stripHeaders(details.responseHeaders, 'set-cookie')) {
             request.blockedThirdPartyCookie = true;
             return {
@@ -234,29 +243,33 @@ function getDomain(url) {
     return new URL(url).hostname;
 }
 
-function isFirstPartyRequest(domain, initiator) {
-    if (!domain) throw new Error('Must provide domain');
-    if (!initiator
-        || initiator.indexOf(domain) >= 0) {
+/**
+ * try to match server names in both directions, because we cannot be sure
+ * whether we are loading twitter.com, www.twitter.com, or api.twitter.com
+ */
+function fuzzyContains(a, b) {
+    if (!(a && b)) return false;
+    if ((a.length >= b.length && a.indexOf(b) >= 0) || b.indexOf(a) >= 0) {
         return true; // request is calling back to the origin, e.g. first-party
     }
     return false;
+
 }
 
-function isAllowedServiceRequest(serviceId, initiator) {
-    if (!services.hasOwnProperty(serviceId)) {
+function isFirstPartyRequest(domain, pageDomain) {
+    if (!domain) throw new Error('Must provide domain');
+    return fuzzyContains(domain, pageDomain);
+}
+
+function isAllowedServiceRequest(serviceId, pageDomain) {
+    if (!serviceId || !services.hasOwnProperty(serviceId)) {
         return false;
     }
     // is this a request calling back to an allowed url of a first-party service provider?
     var serviceDefinition = services[serviceId],
         serviceDomain = getDomain(serviceDefinition.url);
 
-    if (!initiator
-        || initiator.indexOf(serviceDomain) >= 0) {
-        return true;
-    }
-
-    return false;
+    return fuzzyContains(serviceDomain, pageDomain);
 }
 
 // TODO: add a callback instead of return value

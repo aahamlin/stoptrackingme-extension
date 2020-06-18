@@ -3,30 +3,39 @@ import browser from './browser.js';
 import { initTrackingServices } from './services.js';
 import * as RequestHandler from './requestHandler.js';
 import StreamController from './streams.js';
-import state from './state_provider.js';
-import showTotal from './ui.js';
+import { handleBlockingEvent } from './ui.js';
+import { loadHistory, saveHistory, handleBlockingEvent as handleHistoryEvent } from './history.js';
 
 const netFilters = {
     urls: ['https://*/*', 'http://*/*'],
 };
 
 const eventStreamController = StreamController();
-
 const errorStreamController = StreamController();
 
-initTrackingServices().then(function (trackingServices) {
+loadHistory().then((today) => {
+    console.log('history loaded for today', JSON.stringify(today));
+
+    browser.tabs.onUpdated.addListener(saveHistory);
+
+    return initTrackingServices();
+}).then((trackingServices) => {
     RequestHandler.registerTrackingServices(trackingServices);
     RequestHandler.registerEventSinks(
         eventStreamController.sink,
         errorStreamController.sink);
 
-    browser.tabs.query({}, function (tabs) {
-        for(let i=0; i < tabs.length; i++) {
-            RequestHandler.addTab({tabId: tabs[i].id});
+    browser.tabs.query({}, function(tabs) {
+        var tabId;
+        for (let i = 0; i < tabs.length; i++) {
+            tabId = tabs[i].id;
+            RequestHandler.addTab({ tabId: tabId });
+            RequestHandler.updateTab(tabId, { url: tabs[i].url }, tabs[i]);
         }
     });
 
     browser.tabs.onActivated.addListener(RequestHandler.addTab);
+    browser.tabs.onUpdated.addListener(RequestHandler.updateTab);
     browser.tabs.onRemoved.addListener(RequestHandler.removeTab);
     browser.tabs.onReplaced.addListener(RequestHandler.replaceTab);
 
@@ -44,7 +53,7 @@ initTrackingServices().then(function (trackingServices) {
         );
     }
     catch (e) {
-        // firefox does not support extraHeaders, while chrome requires them
+        // Firefox does not support extraHeaders, while chrome requires them
         browser.webRequest.onBeforeSendHeaders.addListener(
             RequestHandler.handleSendHeaders,
             netFilters,
@@ -81,23 +90,8 @@ initTrackingServices().then(function (trackingServices) {
 
 });
 
-// TODO: move stream listener into relevant ui and history modules
-eventStreamController.stream.listen(function(event) {
-    const { type, data } = event;
-    // TODO: store history
-    if (type === 'blockedTrackingService' || type === 'blockedThirdPartyCookie') {
-        if(!state.hasOwnProperty(data.tabId)) {
-            return;
-        }
-        // TODO add date and category details
-        state[data.tabId].totalCount += 1;
-        showTotal(state[data.tabId].totalCount.toString(),
-                  data.tabId);
-    }
-    else  {
-        console.log('event type not handled: ' + type, data);
-    }
-});
+eventStreamController.stream.listen(handleBlockingEvent);
+eventStreamController.stream.listen(handleHistoryEvent);
 
 errorStreamController.stream.listen(function(err) {
     const { data } = err;

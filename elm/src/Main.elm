@@ -1,7 +1,8 @@
 port module Main exposing (main)
 
 import Browser
-import Html exposing (..)
+import Dict exposing (Dict)
+import Html exposing (Html, div, h3, ol, p, span, text, ul)
 import Json.Decode as Decode exposing (Decoder, Error(..), Value, decodeValue)
 
 
@@ -16,19 +17,50 @@ main =
 
 
 type alias Model =
-    { categories : List Category
+    { history : Dict String DailyCountPerCategory
     , error : Maybe Error
     }
 
 
-type alias Category =
-    { name : String
-    , count : Int
-    }
+type alias DailyCountPerCategory =
+    Dict String Int
 
 
+historyDecoder : Decoder (Dict String DailyCountPerCategory)
+historyDecoder =
+    Decode.dict categoriesDecoder
+
+
+categoriesDecoder : Decoder (Dict String Int)
+categoriesDecoder =
+    Decode.dict Decode.int
+
+
+mergeHistory : Dict String DailyCountPerCategory -> Dict String DailyCountPerCategory -> Dict String DailyCountPerCategory
+mergeHistory old new =
+    Dict.merge
+        (\key a -> Dict.insert key a)
+        (\key a b -> Dict.insert key (mergeDailyCount a b))
+        (\key b -> Dict.insert key b)
+        old
+        new
+        Dict.empty
+
+
+mergeDailyCount : Dict String Int -> Dict String Int -> Dict String Int
+mergeDailyCount old new =
+    Dict.merge
+        (\key a -> Dict.insert key a)
+        (\key a b -> Dict.insert key (a + b))
+        (\key b -> Dict.insert key b)
+        old
+        new
+        Dict.empty
+
+
+emptyHistory : Model
 emptyHistory =
-    { categories = []
+    { history = Dict.empty
     , error = Nothing
     }
 
@@ -41,23 +73,14 @@ init _ =
 type Msg
     = GotHistoryMsg Value
 
-categoriesDecoder : Decoder (List Category)
-categoriesDecoder =
-    Decode.list categoryDecoder
-
-categoryDecoder : Decoder Category
-categoryDecoder =
-    Decode.map2 Category
-        (Decode.field "name" Decode.string)
-        (Decode.field "count" Decode.int)
 
 update : Msg -> Model -> ( Model, Cmd Msg )
 update msg model =
     case msg of
         GotHistoryMsg value ->
-            case decodeValue categoriesDecoder value of
+            case decodeValue historyDecoder value of
                 Ok data ->
-                    ( { model | categories = data }, Cmd.none )
+                    ( { model | history = mergeHistory model.history data }, Cmd.none )
 
                 Err error ->
                     ( { model | error = Just error }, Cmd.none )
@@ -69,6 +92,10 @@ subscriptions _ =
 
 
 port onHistoryChange : (Value -> msg) -> Sub msg
+
+
+
+-- VIEW
 
 
 view : Model -> Html Msg
@@ -86,7 +113,7 @@ viewHistoryOrError model =
             viewError error
 
         Nothing ->
-            viewHistory model.categories
+            viewHistory model.history
 
 
 viewError : Error -> Html Msg
@@ -109,15 +136,26 @@ viewError error =
         ]
 
 
-viewHistory : List Category -> Html Msg
-viewHistory categories =
+viewHistory : Dict String DailyCountPerCategory -> Html Msg
+viewHistory days =
     ul []
-        (List.map viewCategory categories)
+        (List.map viewDailyCount (Dict.toList days))
 
 
-viewCategory : Category -> Html Msg
-viewCategory category =
+viewDailyCount : ( String, DailyCountPerCategory ) -> Html Msg
+viewDailyCount ( day, categories ) =
     div []
-        [ div [] [ text category.name ]
-        , div [] [ text (String.fromInt category.count) ]
+        [ p [] [ text day ]
+        , ol []
+            (List.map viewCategory (Dict.toList categories))
+        ]
+
+
+viewCategory : ( String, Int ) -> Html Msg
+viewCategory ( name, count ) =
+    div []
+        [ div []
+            [ span [] [ text name ]
+            , span [] [ text (String.fromInt count) ]
+            ]
         ]

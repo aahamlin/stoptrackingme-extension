@@ -13,3 +13,16 @@ export function copy(target, ...sources) {
     }
     return target;
 }
+
+
+
+export function updateState(state, newState) {
+    for(let tabId in newState) {
+        if (!state.hasOwnProperty(tabId)) {
+            state[tabId] = {};
+        }
+        // TODO implement a deep_copy
+        state[tabId] = copy(state[tabId],
+                            newState[tabId]);
+    }
+}

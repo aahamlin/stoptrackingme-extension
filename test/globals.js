@@ -32,22 +32,27 @@
 
 
 /* test setup pollutes global namespace */
-if (!window.browser && !window.chrome) {
-    Object.assign(window, {
-        browser: {}
-    });
-}
+(function() {
+    ensureBrowser();
+    installBrowserAPIStub(window.browser || window.chrome);
 
-installBrowserAPIStub(window.browser || window.chrome);
-
-function installBrowserAPIStub(b) {
-    if (!b) throw new Error('unable to initialize test env');
-    if(!b.browserAction){
-        Object.assign(b, {
-            browserAction: {},
-            storage: {},
-            webRequest: {},
-            extension: {}
-        });
+    function ensureBrowser() {
+        if (!window.browser && !window.chrome) {
+            Object.assign(window, {
+                browser: {}
+            });
+        }
     }
-}
+    function installBrowserAPIStub(b) {
+        if (!b) throw new Error('unable to initialize test env');
+        if(!b.browserAction){
+            Object.assign(b, {
+                browserAction: {},
+                storage: {},
+                webRequest: {},
+                extension: {},
+                runtime: {}
+            });
+        }
+    }
+})();

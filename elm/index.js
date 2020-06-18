@@ -1,21 +1,30 @@
 'use strict';
-
-require('./popup.html');
-
-const { Elm } = require('./src/Main.elm');
+// ES 2015 imports
+import './popup.html';
+import browser from '../src/browser.js';
+import { Elm } from './src/Main.elm';
 
 const app = Elm.Main.init({
     node: document.getElementById('main'),
 });
 
-// TODO add ports and browser.storage
-var fakeHistory = [
-    { name: "cat1", count: 1 },
-    { name: "cat2", count: 2 }
-]
-setInterval(function () {
-    console.log('sending updated history');
-    fakeHistory[0].count *= 3;
-    fakeHistory[1].count *= 2;
-    app.ports.onHistoryChange.send(fakeHistory);
-}, 1000);
+function sendHistory(history) {
+    app.ports.onHistoryChange.send(history);
+};
+
+browser.storage.local.get(null, function (history) {
+    //console.warn('sending initial history:' + JSON.stringify(history));
+    sendHistory(history);
+});
+
+browser.storage.onChanged.addListener(function(changes, storageArea) {
+    var key, historyChange = {};
+
+    if (storageArea !== 'local') return;
+    // reconstruct the expected history data from the change data
+    for (key in changes) {
+        historyChange[key] = changes[key].newValue;
+        //console.warn('sending history update:' + JSON.stringify(historyChange));
+        sendHistory(historyChange);
+    }
+});
