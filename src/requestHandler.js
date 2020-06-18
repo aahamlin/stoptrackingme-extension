@@ -1,10 +1,7 @@
 import { lookup } from './services.js';
-import { Sink } from './streams.js';
-import state, { eventStream, errorStream } from './state_provider.js';
+import state from './state_provider.js';
 
-const eventSink = Sink(eventStream);
-
-const errorSink = Sink(errorStream);
+var _eventSink, _errorSink;
 
 const services = {};
 
@@ -21,6 +18,11 @@ export function registerTrackingServices(trackingServices) {
     for(let service in trackingServices) {
         services[service] = trackingServices[service];
     }
+}
+
+export function registerEventSinks(eventSink, errorSink) {
+    _eventSink = eventSink;
+    _errorSink = errorSink;
 }
 
 
@@ -48,23 +50,15 @@ export function replaceTab(newTabId, oldTabId) {
     }
 }
 
-function getDomain(url) {
-    return new URL(url).hostname;
-}
-
 export function beginRequest(details) {
     const { tabId, requestId } = details;
 
     // shouldn't re-enter, but place holder for tabId handling
-    if (!state.hasOwnProperty(tabId)) {
+    if (!state.hasOwnProperty(tabId)
+       || !details.initiator) {
         return;
     }
 
-    if(!details.initiator) {
-        return;
-    }
-
-    var pageDomain = getDomain(details.initiator);
     var requestDomain = getDomain(details.url);
 
     var request = {
@@ -80,22 +74,18 @@ export function beginRequest(details) {
 
     if (serviceId) {
         request.serviceId = serviceId;
-        var serviceDefinition = services[serviceId],
-            serviceDomain = getDomain(serviceDefinition.url);
-
-        // allow first-party services
-        if (serviceDomain !== pageDomain) {
+        // allows first-party services (initiator) to load their known services
+        if (wantRequestBlocking(request, details.initiator)) {
             request.cancelled = true;
         }
     }
-    // move third-party cookie handling to send,recv headers 
-    else if (pageDomain !== requestDomain) {
-        request.blockCookies = true;
-        console.log('blocking third-party cookies b/c ' + requestDomain
-                    + ' does not match '
-                    + pageDomain,
-                    details.url);
-    }
+    // else if (pageDomain !== requestDomain) {
+    //     request.blockCookies = true;
+    //     console.log('blocking third-party cookies b/c ' + requestDomain
+    //                 + ' does not match '
+    //                 + pageDomain,
+    //                 details.url);
+    // }
 
     state[tabId].requests[requestId] = request;
 
@@ -117,6 +107,7 @@ export function handleSendHeaders(details) {
     var requestHeaders, request;
 
     if (!state.hasOwnProperty(tabId)
+        || !details.initiator
         || !state[tabId].requests.hasOwnProperty(requestId)) {
         return;
     }
@@ -127,7 +118,11 @@ export function handleSendHeaders(details) {
 
     request = state[tabId].requests[requestId];
 
-    if(request.blockCookies) {
+    if(wantRequestBlocking(request, details.initiator)) {
+        // console.log('blocking third-party cookies b/c '
+        //             + details.initiator + ' does not match '
+        //             + request.siteName, details.url);
+
         // TODO use synchronous callback
         if(requestHeaders = stripHeaders(details.requestHeaders, 'cookie')) {
             request.blockedThirdPartyCookie = true;
@@ -136,7 +131,6 @@ export function handleSendHeaders(details) {
             };
         }
     }
-
 }
 
 export function handleHeadersReceived(details) {
@@ -145,6 +139,7 @@ export function handleHeadersReceived(details) {
     var responseHeaders, request;
 
     if (!state.hasOwnProperty(tabId)
+        || !details.initiator
         || !state[tabId].requests.hasOwnProperty(requestId)) {
         return;
     }
@@ -155,7 +150,11 @@ export function handleHeadersReceived(details) {
 
     request = state[tabId].requests[requestId];
 
-    if(request.blockCookies) {
+    if(wantRequestBlocking(request, details.initiator)) {
+        // console.log('blocking third-party set-cookies b/c '
+        //             + details.initiator + ' does not match '
+        //             + request.siteName, details.url);
+
         // TODO use synchronous callback
         if(responseHeaders = stripHeaders(details.responseHeaders, 'set-cookie')) {
             request.blockedThirdPartyCookie = true;
@@ -169,17 +168,15 @@ export function handleHeadersReceived(details) {
 export function endRequest(details) {
     const { tabId, requestId } = details;
 
-    var request, eventData;
-
     if (!state.hasOwnProperty(tabId)
         || !state[tabId].requests.hasOwnProperty(requestId)) {
         return;
     }
 
-    request = state[tabId].requests[requestId];
+    var request = state[tabId].requests[requestId];
 
     if (request.blockedThirdPartyCookie) {
-        eventSink.add(blockedThirdPartyCookieEvent(request));
+        emitEvent(blockedThirdPartyCookieEvent(request));
     }
 
     delete state[tabId].requests[requestId];
@@ -196,10 +193,10 @@ export function handleError(details) {
     var request = state[tabId].requests[requestId];
 
     if (request.cancelled) {
-        eventSink.add(blockedTrackingServiceEvent(request));
+        emitEvent(blockedTrackingServiceEvent(request));
     }
     else if(details.error) {
-        errorSink.add({type: 'error', data: details.error});
+        emitError({type: 'error', data: details.error});
     }
 
     delete state[tabId].requests[requestId];
@@ -235,6 +232,39 @@ function blockedThirdPartyCookieEvent(req) {
         type: 'blockedThirdPartyCookie',
         data: data
     };
+}
+
+function emitEvent(obj) {
+    if(!_eventSink) console.error('event sink not registered');
+    else _eventSink.add(obj);
+}
+
+function emitError(obj) {
+    if(!_errorSink) console.error('event sink not registered');
+    else _errorSink.add(obj);
+}
+
+function getDomain(url) {
+    return new URL(url).hostname;
+}
+
+function wantRequestBlocking(request, initiator) {
+    if (!initiator) return;
+    if (initiator.indexOf(request.siteName) >= initiator.indexOf('://')+3) {
+        return false; // request is calling back to the origin, e.g. first-party
+    }
+    // is this a request calling back to an allowed url of a first-party service provider?
+    if (request.serviceId) {
+        var serviceDefinition = services[request.serviceId],
+            serviceDomain = getDomain(serviceDefinition.url);
+
+        // find the first party site and does it match our initiator?
+        if (initiator.indexOf(serviceDomain) >= initiator.indexOf('://')+3) {
+            return false;
+        }
+    }
+
+    return true;
 }
 
 // TODO: add a callback instead of return value

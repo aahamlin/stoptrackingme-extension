@@ -1,9 +1,10 @@
 import testData from './helpers/testData.js';
 import * as testUtils from './helpers/testUtils.js';
 import { configureServices } from '../src/services.js';
-import state, { eventStream as stream, errorStream } from '../src/state_provider.js';
+import state from '../src/state_provider.js';
 import {
     registerTrackingServices,
+    registerEventSinks,
     addTab,
     removeTab,
     replaceTab,
@@ -15,6 +16,8 @@ import {
 } from '../src/requestHandler.js';
 
 describe('requestHandler', function () {
+
+    var eventSpy, errorSpy;
 
     const detailsOfTracker = {
         tabId: 1,
@@ -65,33 +68,25 @@ describe('requestHandler', function () {
         registerTrackingServices(
             configureServices(testData));
 
+        // todo use spies
+        eventSpy = sinon.spy();
+        errorSpy = sinon.spy();
+
+        registerEventSinks({add: eventSpy}, {add:errorSpy});
+
         updateState({
             '1': {
                 requests: {},
                 totalCount: 0
             }
         });
-
-        expect(detailsOfNonTracker.initiator).to.be.equal('https://www.initiator.com/');
-        expect(detailsOfTracker.initiator).to.be.equal('https://www.initiator.com/');
-
-
     });
 
     afterEach(function () {
         testUtils.clearAllProps(state);
-
-        if (stream.listeners && stream.listeners.length) {
-            stream.listeners = [];
-        }
-
-        if (errorStream.listeners && errorStream.listeners.length) {
-            errorStream.listeners = [];
-        }
-
+        // some tests have to change these values, make sure use a copy
         expect(detailsOfNonTracker.initiator).to.be.equal('https://www.initiator.com/');
         expect(detailsOfTracker.initiator).to.be.equal('https://www.initiator.com/');
-
     });
 
     it('#addTab creates state[tabId]', function () {
@@ -135,7 +130,7 @@ describe('requestHandler', function () {
 
     it('#beginRequest() does not cancel first-party tracking service request', function () {
         var details = testUtils.copy({}, detailsOfTracker);
-        details.initiator = 'http://63squares.com';
+        details.initiator = undefined; //'http://63squares.com';
         var ret = beginRequest(details);
         expect(ret).to.be.undefined;
     });
@@ -145,34 +140,16 @@ describe('requestHandler', function () {
         expect(ret).to.be.undefined;
     });
 
-    it('#beginRequest() marks third-party request', function () {
-        var ret = beginRequest(detailsOfNonTracker);
-        expect(state[1].requests[detailsOfNonTracker.requestId])
-            .to.have.property('blockCookies', true);
-        expect(ret).to.be.undefined;
-    });
-
-    it('#beginRequest() recognizes a first-party request', function () {
-        var details = testUtils.copy({}, detailsOfNonTracker);
-        details.initiator = 'https://www.safeurl.com';
-        var ret = beginRequest(details);
-        expect(state[1].requests[detailsOfNonTracker.requestId])
-            .to.have.property('blockCookies', false);
-        expect(ret).to.be.undefined;
-    });
-
     it('#handleSendHeaders() removes third-party cookies', function() {
         updateState({
             1: {
                 requests: {
                     127: {
-                        blockCookies: true
-                    }
+                        requestId: detailsOfNonTracker.requestId
+                    },
                 }
             }
         });
-
-
         var res = handleSendHeaders(detailsOfNonTracker);
         expect(res).to.be.an('object');
         expect(res).to.have.property('requestHeaders');
@@ -182,17 +159,19 @@ describe('requestHandler', function () {
     });
 
     it('#handleSendHeaders() does not remove first-party cookies', function() {
+        var details = testUtils.copy({}, detailsOfTracker);
+        details.initiator = undefined; //'http://63squares.com';
+
         updateState({
             1: {
                 requests: {
-                    127: {
-                        blockCookies: false
-                    }
+                    132: {
+                        requestId: detailsOfTracker.requestId
+                    },
                 }
             }
         });
-
-        expect(handleSendHeaders(detailsOfNonTracker)).to.be.undefined;
+        expect(handleSendHeaders(details)).to.be.undefined;
     });
 
 
@@ -201,12 +180,11 @@ describe('requestHandler', function () {
             1: {
                 requests: {
                     127: {
-                        blockCookies: true
-                    }
+                        requestId: detailsOfNonTracker.requestId
+                    },
                 }
             }
         });
-
         var res = handleHeadersReceived(detailsOfNonTracker);
         expect(res).to.be.an('object');
         expect(res).to.have.property('responseHeaders');
@@ -221,17 +199,19 @@ describe('requestHandler', function () {
     });
 
     it('#handleHeadersReceived() does not remove first-party set-cookies', function() {
+        var details = testUtils.copy({}, detailsOfTracker);
+        details.initiator = undefined; //'http://63squares.com';
         updateState({
             1: {
                 requests: {
-                    127: {
-                        blockCookies: false
-                    }
+                    132: {
+                        requestId: detailsOfTracker.requestId
+                    },
                 }
             }
         });
 
-        expect(handleHeadersReceived(detailsOfNonTracker)).to.be.undefined;
+        expect(handleHeadersReceived(details)).to.be.undefined;
     });
 
     it('#endRequest() removes requestId from state', function () {
@@ -254,16 +234,8 @@ describe('requestHandler', function () {
     });
 
 
-    it('#endRequest emits blocked cookie event', function (done) {
+    it('#endRequest emits blocked cookie event', function () {
         var startTime = Date.now();
-        stream.listen(function (eventObj) {
-            expect(eventObj).to.have.property('type', 'blockedThirdPartyCookie');
-            expect(eventObj).to.have.property('data')
-                .and.to.deep.include(
-                    { tabId: 1, siteName: 'www.safeurl.com', blockedTime: startTime });
-            done();
-        });
-
         updateState({
             1: {
                 requests: {
@@ -278,9 +250,8 @@ describe('requestHandler', function () {
             }
         });
 
-
         endRequest(detailsOfNonTracker);
-
+        expect(eventSpy.calledOnce).to.be.true;
     });
 
     it('#handleError() removes requestId from state', function () {
@@ -302,17 +273,8 @@ describe('requestHandler', function () {
         expect(state[detailsOfNonTracker.tabId].requests).to.have.property(detailsOfNonTracker.requestId);
     });
 
-    it('#handleError emits blocked tracker event', function (done) {
+    it('#handleError emits blocked tracker event', function () {
         var startTime = Date.now();
-
-        stream.listen(function (eventObj) {
-
-            expect(eventObj).to.have.property('type', 'blockedTrackingService');
-            expect(eventObj).to.have.property('data').and.to.deep.include(
-                    { category: 'Analytics', blockedTime: startTime });
-            done();
-        });
-
         updateState({
             1: {
                 requests: {
@@ -327,9 +289,10 @@ describe('requestHandler', function () {
         });
 
         handleError(detailsOfTracker);
+        expect(eventSpy.calledOnce).to.be.true;
     });
 
-    it('#handleError emits error event', function (done) {
+    it('#handleError emits error event', function () {
         var errorDetails = testUtils.copy({error: 'test error'}, detailsOfTracker);
         var reqState = {};
 
@@ -339,13 +302,10 @@ describe('requestHandler', function () {
             siteName: '1234.g.63squares.com'
         };
 
-        errorStream.listen(function (errObj) {
-            expect(errObj).to.deep.equal({type: 'error', data: 'test error'});
-            done();
-        });
-
         updateState({ 1: { requests: reqState } });
         handleError(errorDetails);
+
+        expect(errorSpy.calledOnce).to.be.true;
     });
 
 });

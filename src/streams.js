@@ -1,44 +1,65 @@
+// simplistic sink + stream loosely based on Dart streamcontroller
 
-export function Stream() {
-    return Object.create({
-        events: [],
-        listeners: [],
-        listen: function(listener) {
-            var wrappedListener, self = this;
-            if (typeof listener !== 'function') throw new Error('Function required');
-            if (listener.length === 0) throw new Error('Listener fails specification');
+export function StreamController() {
 
-            // TODO: remove - this is unnecessary with the exposure of listeners property
-            wrappedListener = Object.create({
-                listenFn: listener,
-                stop: function () {
-                    const isSelf = (element) => Object.is(this, element);
-                    self.listeners.splice(self.listeners.findIndex(isSelf), 1);
+    const events = [];
+    const listeners = [];
+
+    var _isClosed = false;
+
+    function addEvent(event) {
+        if (_isClosed) throw new Error('stream is already closed');
+        if (!event) throw new Error('No event provided');
+        console.log('add event', event);
+        events.push(event);
+        setTimeout(function() {
+            var nextEvent;
+            if (listeners.length < 1) return;
+            while((nextEvent = events.shift()) !== undefined) {
+                console.log('send event', nextEvent);
+                for(var i = 0; i < listeners.length; i++) {
+                    listeners[i](nextEvent);
                 }
-            });
+            }
+        }, 0);
+    };
 
-            self.listeners.push(wrappedListener);
-            return wrappedListener;
+    function addListener(listener) {
+        if (_isClosed) throw new Error('stream is already closed');
+        if (typeof listener !== 'function') throw new Error('Function required');
+        if (listener.length === 0) throw new Error('Listener fails specification');
+        listeners.push(listener);
+    };
+
+    return Object.create({
+        stream: Stream(addListener),
+        sink: Sink(addEvent),
+        isClosed: () => _isClosed,
+        close: function () {
+            _isClosed = true;
+            events.splice(0);
+            listeners.splice(0);
+        }
+    });
+
+}
+
+function Stream(addListener) {
+
+    return Object.create({
+        listen: function(listener) {
+            addListener(listener);
         },
     });
 }
 
-export function Sink(stream) {
-    const _stream = stream;
+function Sink(addEvent) {
     return Object.create({
         add: function (obj) {
-            _stream.events.push(obj);
-            setTimeout(function() {
-                var nextEvent,
-                    listeners = _stream.listeners;
-                if (listeners.length < 1) return; // no one listening
-                while((nextEvent = _stream.events.shift()) !== undefined) {
-                    //console.log(`sending events to ${listeners.length} listeners`);
-                    for(let i = 0; i < listeners.length; i++) {
-                        listeners[i].listenFn(nextEvent);
-                    }
-                }
-            }, 0);
+            addEvent(obj);
         }
     });
 }
+
+
+export { StreamController as default };

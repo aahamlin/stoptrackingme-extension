@@ -2,16 +2,23 @@
 import browser from './browser.js';
 import { initTrackingServices } from './services.js';
 import * as RequestHandler from './requestHandler.js';
-
-import state, { eventStream, errorStream } from './state_provider.js';
+import StreamController from './streams.js';
+import state from './state_provider.js';
 import showTotal from './ui.js';
 
 const netFilters = {
     urls: ['https://*/*', 'http://*/*'],
 };
 
+const eventStreamController = StreamController();
+
+const errorStreamController = StreamController();
+
 initTrackingServices().then(function (trackingServices) {
     RequestHandler.registerTrackingServices(trackingServices);
+    RequestHandler.registerEventSinks(
+        eventStreamController.sink,
+        errorStreamController.sink);
 
     browser.tabs.query({}, function (tabs) {
         for(let i=0; i < tabs.length; i++) {
@@ -75,23 +82,24 @@ initTrackingServices().then(function (trackingServices) {
 });
 
 // TODO: move stream listener into relevant ui and history modules
-eventStream.listen(function(event) {
+eventStreamController.stream.listen(function(event) {
     const { type, data } = event;
     // TODO: store history
-    if (type === 'blockedTrackingService') {
+    if (type === 'blockedTrackingService' || type === 'blockedThirdPartyCookie') {
         if(!state.hasOwnProperty(data.tabId)) {
             return;
         }
+        // TODO add date and category details
         state[data.tabId].totalCount += 1;
         showTotal(state[data.tabId].totalCount.toString(),
                   data.tabId);
     }
     else  {
-        console.log(type, data);
+        console.log('event type not handled: ' + type, data);
     }
 });
 
-errorStream.listen(function(err) {
+errorStreamController.stream.listen(function(err) {
     const { data } = err;
     console.warn('Error occurred:' + data);
 });
