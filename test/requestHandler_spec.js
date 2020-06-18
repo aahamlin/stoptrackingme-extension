@@ -121,11 +121,14 @@ describe('requestHandler', function () {
         expect(state[detailsOfTracker.tabId].requests).to.have.property(detailsOfTracker.requestId);
     });
 
-    it('#beginRequest() cancels tracking service request', function () {
+    it('#beginRequest() cancels third-party tracking service request', function () {
         var ret = beginRequest(detailsOfTracker);
         expect(ret).to.have.property('cancel', true);
         // state
         expect(state[1].requests[132]).to.have.property('serviceId');
+        expect(state[1].requests[132]).to.have.property('isFirstPartyRequest', false);
+        expect(state[1].requests[132]).to.have.property('isAllowedServiceRequest', false);
+
     });
 
     it('#beginRequest() does not cancel first-party tracking service request', function () {
@@ -133,9 +136,11 @@ describe('requestHandler', function () {
         details.initiator = undefined; //'http://63squares.com';
         var ret = beginRequest(details);
         expect(ret).to.be.undefined;
+        expect(state[1].requests[132]).to.have.property('isFirstPartyRequest', true);
+        expect(state[1].requests[132]).to.have.property('isAllowedServiceRequest', true);
     });
 
-    it('#beginRequest() does not cancel non-tracking service request', function () {
+    it('#beginRequest() does not cancel non-tracking request', function () {
         var ret = beginRequest(detailsOfNonTracker);
         expect(ret).to.be.undefined;
     });
@@ -166,7 +171,27 @@ describe('requestHandler', function () {
             1: {
                 requests: {
                     132: {
-                        requestId: detailsOfTracker.requestId
+                        requestId: detailsOfTracker.requestId,
+                        isFirstPartyRequest: true,
+                    },
+                }
+            }
+        });
+        expect(handleSendHeaders(details)).to.be.undefined;
+    });
+
+    it('#handleSendHeaders() does not remove third-party cookies related to first-party services', function() {
+        var details = testUtils.copy({}, detailsOfTracker);
+        details.initiator = 'http://63squares.com';
+        details.url = 'https://www.i-stats.com/service';
+
+        updateState({
+            1: {
+                requests: {
+                    132: {
+                        requestId: detailsOfTracker.requestId,
+                        isFirstPartyRequest: false,
+                        isAllowedServiceRequest: true,
                     },
                 }
             }
@@ -205,7 +230,27 @@ describe('requestHandler', function () {
             1: {
                 requests: {
                     132: {
-                        requestId: detailsOfTracker.requestId
+                        requestId: detailsOfTracker.requestId,
+                        isFirstPartyRequest: true,
+                    },
+                }
+            }
+        });
+
+        expect(handleHeadersReceived(details)).to.be.undefined;
+    });
+
+    it('#handleHeadersReceived() does not remove third-party set-cookies related to first-party services', function() {
+        var details = testUtils.copy({}, detailsOfTracker);
+        details.initiator = 'http://63squares.com';
+        details.url = 'https://www.i-stats.com/service';
+        updateState({
+            1: {
+                requests: {
+                    132: {
+                        requestId: detailsOfTracker.requestId,
+                        isFirstPartyRequest: false,
+                        isAllowedServiceRequest: true,
                     },
                 }
             }

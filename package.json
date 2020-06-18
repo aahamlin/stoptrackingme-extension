@@ -10,6 +10,7 @@
         "test:chrome": "karma start --single-run --browsers ChromeHeadless karma.conf.js",
         "test:firefox": "karma start --single-run --browsers FirefoxHeadless karma.conf.js",
         "dev:debug": "karma start --debug --single-run=false --browsers Chromium karma.conf.js",
+        "dev:chrome": "karma start --debug --single-run=false --browsers Chrome karma.conf.js",
         "dev:watch": "karma start --auto-watch --debug --browsers ChromiumHeadless karma.conf.js"
     },
     "author": "Andrew Hamlin <aahamlin@gmail.com>",

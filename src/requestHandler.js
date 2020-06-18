@@ -5,6 +5,11 @@ var _eventSink, _errorSink;
 
 const services = {};
 
+// options
+
+const opts_allowThirdPartyCookies = false;
+
+
 /**
  * register known tracking services with the request module.
  *
@@ -54,8 +59,7 @@ export function beginRequest(details) {
     const { tabId, requestId } = details;
 
     // shouldn't re-enter, but place holder for tabId handling
-    if (!state.hasOwnProperty(tabId)
-       || !details.initiator) {
+    if (!state.hasOwnProperty(tabId)) {
         return;
     }
 
@@ -69,34 +73,24 @@ export function beginRequest(details) {
         blockCookies: false
     };
 
+    // request domain === initiator domain
+    request.isFirstPartyRequest = isFirstPartyRequest(request.siteName, details.initiator);
+
     // move service handling to helper function
     const serviceId = lookup(services, requestDomain);
 
     if (serviceId) {
         request.serviceId = serviceId;
-        // allows first-party services (initiator) to load their known services
-        if (wantRequestBlocking(request, details.initiator)) {
+        request.isAllowedServiceRequest = isAllowedServiceRequest(serviceId, details.initiator);
+        // don't block service requests or their cookies when first-party is the same service
+        if (!request.isAllowedServiceRequest) {
             request.cancelled = true;
         }
     }
-    // else if (pageDomain !== requestDomain) {
-    //     request.blockCookies = true;
-    //     console.log('blocking third-party cookies b/c ' + requestDomain
-    //                 + ' does not match '
-    //                 + pageDomain,
-    //                 details.url);
-    // }
 
     state[tabId].requests[requestId] = request;
 
     if (request.cancelled){
-        // console.log('cancelled request'
-        //             + ' b/c tracking service domain '
-        //             + serviceDomain
-        //             + ' does not match '
-        //             + pageDomain,
-        //             details.url);
-
         return { cancel: true };
     }
 }
@@ -107,7 +101,6 @@ export function handleSendHeaders(details) {
     var requestHeaders, request;
 
     if (!state.hasOwnProperty(tabId)
-        || !details.initiator
         || !state[tabId].requests.hasOwnProperty(requestId)) {
         return;
     }
@@ -118,12 +111,9 @@ export function handleSendHeaders(details) {
 
     request = state[tabId].requests[requestId];
 
-    if(wantRequestBlocking(request, details.initiator)) {
-        // console.log('blocking third-party cookies b/c '
-        //             + details.initiator + ' does not match '
-        //             + request.siteName, details.url);
-
-        // TODO use synchronous callback
+    if(!opts_allowThirdPartyCookies
+       && !request.isFirstPartyRequest
+       && !request.isAllowedServiceRequest) {
         if(requestHeaders = stripHeaders(details.requestHeaders, 'cookie')) {
             request.blockedThirdPartyCookie = true;
             return {
@@ -139,7 +129,6 @@ export function handleHeadersReceived(details) {
     var responseHeaders, request;
 
     if (!state.hasOwnProperty(tabId)
-        || !details.initiator
         || !state[tabId].requests.hasOwnProperty(requestId)) {
         return;
     }
@@ -150,12 +139,9 @@ export function handleHeadersReceived(details) {
 
     request = state[tabId].requests[requestId];
 
-    if(wantRequestBlocking(request, details.initiator)) {
-        // console.log('blocking third-party set-cookies b/c '
-        //             + details.initiator + ' does not match '
-        //             + request.siteName, details.url);
-
-        // TODO use synchronous callback
+    if(!opts_allowThirdPartyCookies
+       && !request.isFirstPartyRequest
+       && !request.isAllowedServiceRequest) {
         if(responseHeaders = stripHeaders(details.responseHeaders, 'set-cookie')) {
             request.blockedThirdPartyCookie = true;
             return {
@@ -248,23 +234,29 @@ function getDomain(url) {
     return new URL(url).hostname;
 }
 
-function wantRequestBlocking(request, initiator) {
-    if (!initiator) return;
-    if (initiator.indexOf(request.siteName) >= initiator.indexOf('://')+3) {
-        return false; // request is calling back to the origin, e.g. first-party
+function isFirstPartyRequest(domain, initiator) {
+    if (!domain) throw new Error('Must provide domain');
+    if (!initiator
+        || initiator.indexOf(domain) >= 0) {
+        return true; // request is calling back to the origin, e.g. first-party
+    }
+    return false;
+}
+
+function isAllowedServiceRequest(serviceId, initiator) {
+    if (!services.hasOwnProperty(serviceId)) {
+        return false;
     }
     // is this a request calling back to an allowed url of a first-party service provider?
-    if (request.serviceId) {
-        var serviceDefinition = services[request.serviceId],
-            serviceDomain = getDomain(serviceDefinition.url);
+    var serviceDefinition = services[serviceId],
+        serviceDomain = getDomain(serviceDefinition.url);
 
-        // find the first party site and does it match our initiator?
-        if (initiator.indexOf(serviceDomain) >= initiator.indexOf('://')+3) {
-            return false;
-        }
+    if (!initiator
+        || initiator.indexOf(serviceDomain) >= 0) {
+        return true;
     }
 
-    return true;
+    return false;
 }
 
 // TODO: add a callback instead of return value
