@@ -1,8 +1,7 @@
-
-import { Sink, Stream } from '../src/streams.js';
+import StreamController from '../src/streams.js';
 
 describe('events', function () {
-    var sink, stream;
+    var streamController;
 
     const evtObj = {
         tabId: 1,
@@ -15,44 +14,39 @@ describe('events', function () {
     };
 
     beforeEach(function() {
-        stream = Stream();
-        sink = Sink(stream);
+        streamController = StreamController();
     });
 
     afterEach(function() {
-        if (stream.listeners && stream.listeners.length) {
-            stream.listeners = [];
-        }
-        expect(stream.listeners.length).to.be.equal(0);
+        streamController.close();
+        expect(streamController.isClosed()).to.be.true;
     });
 
-    it('#listen() requires listener', function () {
-        expect(() => stream.listen()).to.throw(/Function required/);
+    it('#stream#listen() requires listener', function () {
+        expect(() => streamController.stream.listen()).to.throw(/Function required/);
     });
 
-    it('#listen() requires valid listener', function () {
+    it('#stream#listen() requires valid listener', function () {
         var invalidFn = function () {};
-        expect(() => stream.listen(invalidFn)).to.throw(/Listener/);
+        expect(() => streamController.stream.listen(invalidFn)).to.throw(/Listener/);
     });
 
-    it('#listen() returns listener#stop()', function (done) {
-        var listener = stream.listen(function (_) {
-            throw new Error('Listener was not removed');
-        });
-        expect(stream.listeners.length).to.be.equal(1);
-        // secondary stream that will not be removed
-        stream.listen(function(eventObj) {
-            expect(eventObj).to.deep.equal({ type: 'test', data: { id: 1 } });
-            done();
-        });
-        expect(stream.listeners.length).to.be.equal(2);
-        listener.stop();
-        expect(stream.listeners.length).to.be.equal(1);
-        sink.add({ type:'test', data: { id: 1 }});
+    it('#close() stops stream#listen()', function () {
+        streamController.close();
+        expect(() => streamController.stream.listen(function (_) {}))
+            .to.throw(/closed/);
+    });
 
+    it('#close() stops sink#add()', function () {
+        streamController.close();
+        expect(() => streamController.sink.add({}))
+            .to.throw(/closed/);
     });
 
     it('#add() notifies listeners asynchronously', function (done) {
+        var sink = streamController.sink,
+            stream = streamController.stream;
+
         var listenerFn = function (eventObj) {
             if(typeof eventObj === 'object') {
                 expect(eventObj).to.have.property('type', 'blockedCookie');
@@ -69,6 +63,9 @@ describe('events', function () {
     });
 
     it('#send() stores events until listeners are added', function (done) {
+        var sink = streamController.sink,
+            stream = streamController.stream;
+
         var count = 0,
             listenerFn = function (_) {
                 if (++count == 2) {

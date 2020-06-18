@@ -1,10 +1,7 @@
 import { lookup } from './services.js';
-import { Sink } from './streams.js';
-import state, { eventStream, errorStream } from './state_provider.js';
+import state from './state_provider.js';
 
-const eventSink = Sink(eventStream);
-
-const errorSink = Sink(errorStream);
+var _eventSink, _errorSink;
 
 const services = {};
 
@@ -22,6 +19,11 @@ export function registerTrackingServices(trackingServices) {
     }
 }
 
+export function registerEventSinks(eventSink, errorSink) {
+    _eventSink = eventSink;
+    _errorSink = errorSink;
+}
+
 
 export function addTab(info) {
     const { tabId } = info;
@@ -33,24 +35,6 @@ export function addTab(info) {
         };
     }
 }
-
-// export function updateTab(tabId, info, tab) {
-//     console.log('updated ' + tabId, info);
-//     if(!state.hasOwnProperty(tabId)) {
-//         return;
-//     }
-
-//     if (info.status) {
-//         console.log('tabId ' + tabId + ' status = ' + tab.status, info);
-//     }
-
-//     if(info.url) {
-//         state[tabId].siteName = getDomain(tab.url);
-//     }
-//     else if (info.pendingUrl) {
-//         state[tabId].siteName = getDomain(tab.pendingUrl);
-//     }
-// }
 
 export function removeTab(tabId, info) {
     if(state.hasOwnProperty(tabId)) {
@@ -65,23 +49,15 @@ export function replaceTab(newTabId, oldTabId) {
     }
 }
 
-function getDomain(url) {
-    return new URL(url).hostname;
-}
-
 export function beginRequest(details) {
     const { tabId, requestId } = details;
 
     // shouldn't re-enter, but place holder for tabId handling
-    if (!state.hasOwnProperty(tabId)) {
+    if (!state.hasOwnProperty(tabId)
+       || !details.initiator) {
         return;
     }
 
-    if(!details.initiator) {
-        return;
-    }
-
-    var pageDomain = getDomain(details.initiator);
     var requestDomain = getDomain(details.url);
 
     var request = {
@@ -100,17 +76,17 @@ export function beginRequest(details) {
             serviceDomain = getDomain(serviceDefinition.url);
 
         // allow first-party services
-        if (serviceDomain !== pageDomain) {
+        if (isThirdPartyRequest(serviceDomain, details.initiator)) {
             request.cancelled = true;
         }
     }
-    else if (pageDomain !== requestDomain) {
-        request.blockCookies = true;
-        console.log('blocking third-party cookies b/c ' + requestDomain
-                    + ' does not match '
-                    + pageDomain,
-                    details.url);
-    }
+    // else if (pageDomain !== requestDomain) {
+    //     request.blockCookies = true;
+    //     console.log('blocking third-party cookies b/c ' + requestDomain
+    //                 + ' does not match '
+    //                 + pageDomain,
+    //                 details.url);
+    // }
 
     state[tabId].requests[requestId] = request;
 
@@ -132,6 +108,7 @@ export function handleSendHeaders(details) {
     var requestHeaders, request;
 
     if (!state.hasOwnProperty(tabId)
+        || !details.initiator
         || !state[tabId].requests.hasOwnProperty(requestId)) {
         return;
     }
@@ -142,7 +119,11 @@ export function handleSendHeaders(details) {
 
     request = state[tabId].requests[requestId];
 
-    if(request.blockCookies) {
+    if(isThirdPartyRequest(request.siteName, details.initiator)) {
+        console.log('blocking third-party cookies b/c '
+                    + request.tabSiteName + ' does not match '
+                    + request.siteName, details.url);
+
         // TODO use synchronous callback
         if(requestHeaders = stripHeaders(details.requestHeaders, 'cookie')) {
             request.blockedThirdPartyCookie = true;
@@ -160,6 +141,7 @@ export function handleHeadersReceived(details) {
     var responseHeaders, request;
 
     if (!state.hasOwnProperty(tabId)
+        || !details.initiator
         || !state[tabId].requests.hasOwnProperty(requestId)) {
         return;
     }
@@ -170,7 +152,11 @@ export function handleHeadersReceived(details) {
 
     request = state[tabId].requests[requestId];
 
-    if(request.blockCookies) {
+    if(isThirdPartyRequest(request.siteName, details.initiator)) {
+        console.log('blocking third-party set-cookies b/c '
+                    + request.tabSiteName + ' does not match '
+                    + request.siteName, details.url);
+
         // TODO use synchronous callback
         if(responseHeaders = stripHeaders(details.responseHeaders, 'set-cookie')) {
             request.blockedThirdPartyCookie = true;
@@ -194,7 +180,7 @@ export function endRequest(details) {
     request = state[tabId].requests[requestId];
 
     if (request.blockedThirdPartyCookie) {
-        eventSink.add(blockedThirdPartyCookieEvent(request));
+        emitEvent(blockedThirdPartyCookieEvent(request));
     }
 
     delete state[tabId].requests[requestId];
@@ -211,10 +197,10 @@ export function handleError(details) {
     var request = state[tabId].requests[requestId];
 
     if (request.cancelled) {
-        eventSink.add(blockedTrackingServiceEvent(request));
+        emitEvent(blockedTrackingServiceEvent(request));
     }
     else if(details.error) {
-        errorSink.add({type: 'error', data: details.error});
+        emitError({type: 'error', data: details.error});
     }
 
     delete state[tabId].requests[requestId];
@@ -250,6 +236,30 @@ function blockedThirdPartyCookieEvent(req) {
         type: 'blockedThirdPartyCookie',
         data: data
     };
+}
+
+function emitEvent(obj) {
+    if(!_eventSink) console.error('event sink not registered');
+    else _eventSink.add(obj);
+}
+
+function emitError(obj) {
+    if(!_errorSink) console.error('event sink not registered');
+    else _errorSink.add(obj);
+}
+
+function getDomain(url) {
+    return new URL(url).hostname;
+}
+
+function isThirdPartyRequest(requestDomain, initiator) {
+    // rather than constructing a URL object, we can just test
+    // if the request domain is included in the origin str (after scheme)
+    if (initiator
+        && initiator.indexOf(requestDomain) >= initiator.indexOf('://')+3) {
+        return false; // a first-party request
+    }
+    return true;
 }
 
 // TODO: add a callback instead of return value
