@@ -72,11 +72,8 @@ export function beginRequest(details) {
 
     if (serviceId) {
         request.serviceId = serviceId;
-        var serviceDefinition = services[serviceId],
-            serviceDomain = getDomain(serviceDefinition.url);
-
-        // allow first-party services
-        if (isThirdPartyRequest(serviceDomain, details.initiator)) {
+        // allows first-party services (initiator) to load their known services
+        if (wantRequestBlocking(request, details.initiator)) {
             request.cancelled = true;
         }
     }
@@ -119,10 +116,10 @@ export function handleSendHeaders(details) {
 
     request = state[tabId].requests[requestId];
 
-    if(isThirdPartyRequest(request.siteName, details.initiator)) {
-        console.log('blocking third-party cookies b/c '
-                    + request.tabSiteName + ' does not match '
-                    + request.siteName, details.url);
+    if(wantRequestBlocking(request, details.initiator)) {
+        // console.log('blocking third-party cookies b/c '
+        //             + details.initiator + ' does not match '
+        //             + request.siteName, details.url);
 
         // TODO use synchronous callback
         if(requestHeaders = stripHeaders(details.requestHeaders, 'cookie')) {
@@ -132,7 +129,6 @@ export function handleSendHeaders(details) {
             };
         }
     }
-
 }
 
 export function handleHeadersReceived(details) {
@@ -152,10 +148,10 @@ export function handleHeadersReceived(details) {
 
     request = state[tabId].requests[requestId];
 
-    if(isThirdPartyRequest(request.siteName, details.initiator)) {
-        console.log('blocking third-party set-cookies b/c '
-                    + request.tabSiteName + ' does not match '
-                    + request.siteName, details.url);
+    if(wantRequestBlocking(request, details.initiator)) {
+        // console.log('blocking third-party set-cookies b/c '
+        //             + details.initiator + ' does not match '
+        //             + request.siteName, details.url);
 
         // TODO use synchronous callback
         if(responseHeaders = stripHeaders(details.responseHeaders, 'set-cookie')) {
@@ -170,14 +166,12 @@ export function handleHeadersReceived(details) {
 export function endRequest(details) {
     const { tabId, requestId } = details;
 
-    var request, eventData;
-
     if (!state.hasOwnProperty(tabId)
         || !state[tabId].requests.hasOwnProperty(requestId)) {
         return;
     }
 
-    request = state[tabId].requests[requestId];
+    var request = state[tabId].requests[requestId];
 
     if (request.blockedThirdPartyCookie) {
         emitEvent(blockedThirdPartyCookieEvent(request));
@@ -252,13 +246,22 @@ function getDomain(url) {
     return new URL(url).hostname;
 }
 
-function isThirdPartyRequest(requestDomain, initiator) {
-    // rather than constructing a URL object, we can just test
-    // if the request domain is included in the origin str (after scheme)
-    if (initiator
-        && initiator.indexOf(requestDomain) >= initiator.indexOf('://')+3) {
-        return false; // a first-party request
+function wantRequestBlocking(request, initiator) {
+    if (!initiator) return;
+    if (initiator.indexOf(request.siteName) >= initiator.indexOf('://')+3) {
+        return false; // request is calling back to the origin, e.g. first-party
     }
+    // is this a request calling back to an allowed url of a first-party service provider?
+    if (request.serviceId) {
+        var serviceDefinition = services[request.serviceId],
+            serviceDomain = getDomain(serviceDefinition.url);
+
+        // find the first party site and does it match our initiator?
+        if (initiator.indexOf(serviceDomain) >= initiator.indexOf('://')+3) {
+            return false;
+        }
+    }
+
     return true;
 }
 

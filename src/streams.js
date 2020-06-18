@@ -10,11 +10,13 @@ export function StreamController() {
     function addEvent(event) {
         if (_isClosed) throw new Error('stream is already closed');
         if (!event) throw new Error('No event provided');
+        console.log('add event', event);
         events.push(event);
         setTimeout(function() {
             var nextEvent;
             if (listeners.length < 1) return;
             while((nextEvent = events.shift()) !== undefined) {
+                console.log('send event', nextEvent);
                 for(var i = 0; i < listeners.length; i++) {
                     listeners[i](nextEvent);
                 }
