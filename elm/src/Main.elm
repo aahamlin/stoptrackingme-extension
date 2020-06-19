@@ -51,7 +51,7 @@ mergeDailyCount : Dict String Int -> Dict String Int -> Dict String Int
 mergeDailyCount old new =
     Dict.merge
         (\key a -> Dict.insert key a)
-        (\key a b -> Dict.insert key (a + b))
+        (\key a b -> Dict.insert key b) -- daily counts are always a total, so take new value
         (\key b -> Dict.insert key b)
         old
         new
