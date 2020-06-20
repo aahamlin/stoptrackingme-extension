@@ -3,7 +3,7 @@ const { CleanWebpackPlugin } = require('clean-webpack-plugin');
 const CopyPlugin = require('copy-webpack-plugin');
 
 // elm stuff
-module.exports = {
+var config = {
 
     entry: {
         popup: [
@@ -19,7 +19,7 @@ module.exports = {
     module: {
         rules: [
             {
-                test: /\.html$/,
+                test: /\.(html|css)$/,
                 exclude: /node_modules/,
                 loader: 'file-loader?name=[name].[ext]',
             },
@@ -29,8 +29,9 @@ module.exports = {
                 loader: 'elm-webpack-loader?verbose=true',
                 options: {
                     cwd: path.resolve(__dirname, 'elm'),
+                    //optimize: true,
                 },
-            }
+            },
         ],
 
         noParse: /\.elm$/,
@@ -53,4 +54,11 @@ module.exports = {
         contentBase: path.join(__dirname, 'dist'),
 
     },
+};
+
+module.exports = (env, argv) => {
+    if (argv.mode === 'production') {
+        config.module.rules[1].options['optimize'] = true;
+    }
+    return config;
 };

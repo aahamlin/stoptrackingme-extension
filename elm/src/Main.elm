@@ -1,9 +1,16 @@
 port module Main exposing (main)
 
+import Array
 import Browser
+import Chart exposing (chart)
 import Dict exposing (Dict)
-import Html exposing (Html, div, h3, ol, p, span, text, ul)
+import History exposing (..)
+import Html exposing (Html, div, footer, h1, h2, h3, ol, p, span, table, tbody, td, text, th, thead, tr, ul)
+import Html.Attributes exposing (class)
 import Json.Decode as Decode exposing (Decoder, Error(..), Value, decodeValue)
+import Json.Decode.Extra exposing (dict2)
+import Task
+import Time exposing (millisToPosix, posixToMillis)
 
 
 main : Program () Model Msg
@@ -17,61 +24,34 @@ main =
 
 
 type alias Model =
-    { history : Dict String DailyCountPerCategory
+    { history : HistoryModel
+    , todayKey : Int
+    , timeZone : Time.Zone
     , error : Maybe Error
     }
-
-
-type alias DailyCountPerCategory =
-    Dict String Int
-
-
-historyDecoder : Decoder (Dict String DailyCountPerCategory)
-historyDecoder =
-    Decode.dict categoriesDecoder
-
-
-categoriesDecoder : Decoder (Dict String Int)
-categoriesDecoder =
-    Decode.dict Decode.int
-
-
-mergeHistory : Dict String DailyCountPerCategory -> Dict String DailyCountPerCategory -> Dict String DailyCountPerCategory
-mergeHistory old new =
-    Dict.merge
-        (\key a -> Dict.insert key a)
-        (\key a b -> Dict.insert key (mergeDailyCount a b))
-        (\key b -> Dict.insert key b)
-        old
-        new
-        Dict.empty
-
-
-mergeDailyCount : Dict String Int -> Dict String Int -> Dict String Int
-mergeDailyCount old new =
-    Dict.merge
-        (\key a -> Dict.insert key a)
-        (\key a b -> Dict.insert key b) -- daily counts are always a total, so take new value
-        (\key b -> Dict.insert key b)
-        old
-        new
-        Dict.empty
 
 
 emptyHistory : Model
 emptyHistory =
     { history = Dict.empty
+    , todayKey = 0
+    , timeZone = Time.utc
     , error = Nothing
     }
 
 
 init : () -> ( Model, Cmd Msg )
 init _ =
-    ( emptyHistory, Cmd.none )
+    ( emptyHistory, Task.perform GotCurrentTimeMsg Time.now )
 
 
 type Msg
     = GotHistoryMsg Value
+    | GotCurrentTimeMsg Time.Posix
+
+
+
+--    | GotTimeZoneMsg Time.Zone
 
 
 update : Msg -> Model -> ( Model, Cmd Msg )
@@ -85,6 +65,21 @@ update msg model =
                 Err error ->
                     ( { model | error = Just error }, Cmd.none )
 
+        GotCurrentTimeMsg now ->
+            let
+                key =
+                    floor (toFloat (posixToMillis now) / 86400000) * 86400000
+
+                history =
+                    emptyWeekFrom key
+            in
+            ( { model | todayKey = key, history = history }, Cmd.none )
+
+
+
+-- GotTimeZoneMsg zone ->
+--     ( { model | timeZone = zone }, Cmd.none )
+
 
 subscriptions : Model -> Sub Msg
 subscriptions _ =
@@ -94,6 +89,19 @@ subscriptions _ =
 port onHistoryChange : (Value -> msg) -> Sub msg
 
 
+emptyWeekFrom : Int -> HistoryModel
+emptyWeekFrom key =
+    Dict.fromList
+        [ ( key, Array.initialize 7 (always 0) )
+        , ( key - 86400000, Array.initialize 7 (always 0) )
+        , ( key - (2 * 86400000), Array.initialize 7 (always 0) )
+        , ( key - (3 * 86400000), Array.initialize 7 (always 0) )
+        , ( key - (4 * 86400000), Array.initialize 7 (always 0) )
+        , ( key - (5 * 86400000), Array.initialize 7 (always 0) )
+        , ( key - (6 * 86400000), Array.initialize 7 (always 0) )
+        ]
+
+
 
 -- VIEW
 
@@ -101,9 +109,20 @@ port onHistoryChange : (Value -> msg) -> Sub msg
 view : Model -> Html Msg
 view model =
     div []
-        [ p [] [ text "History" ]
+        [ h1 [] [ text "Stop Tracking Me" ]
+        , h2 [] [ text "Recent tracking activity" ]
         , viewHistoryOrError model
+        , viewFooter model
         ]
+
+
+viewFooter : Model -> Html Msg
+viewFooter m =
+    let
+        dateStr =
+            dateLongFormat m.timeZone (millisToPosix m.todayKey)
+    in
+    footer [] [ text ("Days recorded in UTC. Today is " ++ dateStr ++ ".") ]
 
 
 viewHistoryOrError : Model -> Html Msg
@@ -113,7 +132,7 @@ viewHistoryOrError model =
             viewError error
 
         Nothing ->
-            viewHistory model.history
+            viewHistory model
 
 
 viewError : Error -> Html Msg
@@ -128,34 +147,43 @@ viewError error =
                     message
 
                 _ ->
-                    "Error: invalid JSON"
+                    "Invalid JSON"
     in
     div []
         [ h3 [] [ text errorHeading ]
-        , text ("Error: " ++ errorMessage)
+        , p [] [ text ("Error: " ++ errorMessage) ]
         ]
 
 
-viewHistory : Dict String DailyCountPerCategory -> Html Msg
-viewHistory days =
-    ul []
-        (List.map viewDailyCount (Dict.toList days))
-
-
-viewDailyCount : ( String, DailyCountPerCategory ) -> Html Msg
-viewDailyCount ( day, categories ) =
+viewHistory : Model -> Html Msg
+viewHistory m =
     div []
-        [ p [] [ text day ]
-        , ol []
-            (List.map viewCategory (Dict.toList categories))
+        [ div [ class "container" ] [ chart { history = m.history, timeZone = m.timeZone } ]
+        , div [ class "container" ] [ drawDataTable m ]
+        , p [] [ text "Displaying all tracking activity blocked by category over past 7 days." ]
         ]
 
 
-viewCategory : ( String, Int ) -> Html Msg
-viewCategory ( name, count ) =
-    div []
-        [ div []
-            [ span [] [ text name ]
-            , span [] [ text (String.fromInt count) ]
+drawDataTable : Model -> Html Msg
+drawDataTable m =
+    let
+        header =
+            List.map (\key -> th [] [ text (dateFormat m.timeZone (millisToPosix key)) ]) <|
+                Dict.keys m.history
+
+        row =
+            List.map (\arr -> td [] [ text (String.fromInt (List.sum <| Array.toList arr)) ]) <|
+                Dict.values m.history
+    in
+    table [ class "datatable" ]
+        [ thead []
+            [ tr [] <|
+                th [] [ text "Date" ]
+                    :: header
+            ]
+        , tbody []
+            [ tr [] <|
+                th [] [ text "Total" ]
+                    :: row
             ]
         ]

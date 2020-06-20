@@ -9,7 +9,8 @@ describe('ui', function () {
     beforeEach(function() {
         spyOnBrowserAction = sinon.spy();
         Object.assign(browser.browserAction, {
-            setBadgeText: spyOnBrowserAction
+            setBadgeText: spyOnBrowserAction,
+            setBadgeBackgroundColor: spyOnBrowserAction,
         });
     });
 
@@ -20,7 +21,8 @@ describe('ui', function () {
 
     it('#setBadgeText() sends object with text property', function () {
         setBadgeText('1');
-        expect(spyOnBrowserAction.calledOnceWith({text:'1'})).to.be.true;
+        expect(spyOnBrowserAction.calledWith({text:'1'})).to.be.true;
+        expect(spyOnBrowserAction.calledWith({color: sinon.match.string})).to.be.true;
     });
 
     it('#handleBlockingEvent updates badge text', function () {
@@ -29,6 +31,6 @@ describe('ui', function () {
         handleBlockingEvent({ type: 'blockedTrackingService', data: { tabId: 1 }});
         handleBlockingEvent({ type: 'blockedThirdPartyCookie', data: { tabId: 1 }});
         handleBlockingEvent({ type: 'unknownType', data: { tabId: 1 }});
-        expect(spyOnBrowserAction.calledTwice).to.be.true;
+        sinon.assert.callCount(spyOnBrowserAction, 4);
     });
 });
