@@ -6,8 +6,6 @@ import { asDateKey, loadHistory, saveHistory, handleBlockingEvent } from '../src
 
 describe('history', function () {
 
-    var browserStorageSpy;
-
     beforeEach(function () {
         testUtils.clearAllProps(history);
 
@@ -26,10 +24,19 @@ describe('history', function () {
         //sinon.restore();
     });
 
-    it('#asDateKey returns key', function () {
-        var jun19 = new Date(2020, 5, 19);
+    it('#asDateKey returns epoch timestamp string from start of day', function () {
+        var utcJun19 = new Date(Date.UTC(2020, 5, 19, 0, 0, 0, 1));
+        var jun19Key = '' + Date.UTC(2020, 5, 19, 0, 0, 0, 0);
+        var  res = asDateKey(utcJun19.getTime());
+        expect(res).to.be.an('string').and.equal(jun19Key);
+    });
 
-        expect(asDateKey(jun19.getTime())).to.equal('2020-06-19');
+    it('#asDateKey returns epoch timestamp string from end of day', function () {
+        var utcJun18 = new Date(Date.UTC(2020, 5, 18, 23, 59, 59, 999));
+        var jun18Key = '' + Date.UTC(2020, 5, 18, 0, 0, 0, 0);
+        var res = asDateKey(utcJun18.getTime());
+        expect(res).to.be.an('string').and.equal(jun18Key);
+
     });
 
     // TODO https://www.chaijs.com/plugins/chai-as-promised/
@@ -54,16 +61,64 @@ describe('history', function () {
     it('#saveHistory() calls storage.set', function () {
         var fake = sinon.fake();
         browser.storage.local.set = fake;
-        saveHistory(1, { status: 'complete' }, { status: 'complete' });
+        saveHistory();
         expect(fake.calledOnce).to.be.true;
     });
 
-    it('#handleBlockingEvent() increments categories', function () {
+    it('#handleBlockingEvent() increment from existing history value', function () {
         var timeStamp = Date.now(),
             dateKey = asDateKey(timeStamp);
 
-        handleBlockingEvent({ type: 'blockedTrackingService', data: { category: 'cat1', blockedTime: timeStamp } });
+        var old = {};
+        old[dateKey] = [1,0,0,0,0,0,0,0];
+        testUtils.updateState(history, old);
+        handleBlockingEvent({ type: 'blockedThirdPartyCookie', data: { blockedTime: timeStamp } });
         expect(history).to.have.property(dateKey);
-        expect(history[dateKey]).to.have.property('cat1', 1);
+        expect(history[dateKey]).to.be.an('array').and.have.length(8)
+            .and.to.include.ordered.members([2,0,0,0,0,0,0,0]);
     });
+
+    it('#handleBlockingEvent() increments Cookies, twice', function() {
+        var timeStamp = Date.now(),
+            dateKey = asDateKey(timeStamp);
+
+        handleBlockingEvent({ type: 'blockedThirdPartyCookie', data: { blockedTime: timeStamp } });
+        handleBlockingEvent({ type: 'blockedThirdPartyCookie', data: { blockedTime: timeStamp } });
+        expect(history).to.have.property(dateKey);
+        expect(history[dateKey]).to.be.an('array').and.have.length(8)
+            .and.to.include.ordered.members([2,0,0,0,0,0,0,0]);
+    });
+
+    var categoryTests = [
+        {cat: "Advertising", index: 1},
+        {cat: "Analytics", index: 2},
+        {cat: "Content", index: 3},
+        {cat: "Cryptomining", index: 4},
+        {cat: "Disconnect", index: 5}, // merge with social
+        {cat: "Fingerprinting", index: 6},
+        {cat: "Social", index: 5},
+        {cat: "Unknown", index: 7},
+    ];
+
+    categoryTests.forEach((test) => {
+        it('#handleBlockingEvent() increments ' + test.cat + ' category',
+           function() {
+
+               var timeStamp = Date.now(),
+                   dateKey = asDateKey(timeStamp),
+                   testarray = [0,0,0,0,0,0,0,0];
+
+               testarray[test.index] = 1;
+               handleBlockingEvent.apply(null, [{
+                   type: 'blockedTrackingService',
+                   data: { category: test.cat, blockedTime: timeStamp
+                         }
+               }]);
+               expect(history).to.have.property(dateKey);
+               expect(history[dateKey]).to.be.an('array')
+                   .and.have.length(8)
+                   .and.to.include.ordered.members(testarray);
+           });
+    });
+
 });

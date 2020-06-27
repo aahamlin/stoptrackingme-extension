@@ -1,4 +1,4 @@
-import { lookup } from './services.js';
+import { lookup, areEqual } from './services.js';
 import state from './state_provider.js';
 
 var _eventSink, _errorSink;
@@ -6,7 +6,6 @@ var _eventSink, _errorSink;
 const services = {};
 
 // options
-
 const opts_allowThirdPartyCookies = false;
 
 
@@ -48,7 +47,7 @@ export function updateTab(tabId, info, tab) {
     }
 
     if (info.url) {
-        if (!fuzzyContains(tab.url, state[tabId].pageDomain)) {
+        if (!looseContains(tab.url, state[tabId].pageDomain)) {
             state[tabId].pageDomain = getDomain(tab.url);
         }
     }
@@ -74,34 +73,16 @@ export function beginRequest(details) {
         return;
     }
 
-    var requestedDomain = getDomain(details.url);
+    // Things to know
+    // if the first party url domain matches the request domain, then allow all
+    // if request domain matches a service and the first party url domain matches
+    // the service domain or any of service's known domains, then allow because
+    // person has directly requested a known service entity
 
-    if (!details.initiator || details.initiator === 'null') {
-        state[tabId].pageDomain = requestedDomain;
-        //console.warn('switched pageDomain to ' + requestedDomain + ' because initator is empty or "null"', details.initator);
-    }
+    var request = configureRequest(details);
 
-    var request = {
-        tabId: tabId,
-        requestId: requestId,
-        startTime: details.timeStamp,
-        siteName: requestedDomain
-    };
-
-    // request domain === page domain
-    request.isFirstPartyRequest = isFirstPartyRequest(request.siteName,
-                                                      state[tabId].pageDomain);
-
-    const serviceId = lookup(services, requestedDomain);
-
-    if (serviceId) {
-        request.serviceId = serviceId;
-        request.isAllowedServiceRequest = isAllowedServiceRequest(serviceId,
-                                                                  state[tabId].pageDomain/* details.initiator*/);
-        // don't block service requests or their cookies when first-party is the same service
-        if (!request.isAllowedServiceRequest) {
-            request.cancelled = true;
-        }
+    if (request.service && !request.isAllowedServiceRequest) {
+        request.cancelled = true;
     }
 
     state[tabId].requests[requestId] = request;
@@ -199,17 +180,50 @@ export function handleError(details) {
 
 // Private functions
 
+function configureRequest(details) {
+    const { tabId, requestId } = details;
+
+    if (!state.hasOwnProperty(tabId)) {
+        return;
+    }
+
+    var requestDomain = getDomain(details.url);
+
+    if (!details.initiator || details.initiator === 'null') {
+        state[tabId].pageDomain = requestDomain;
+        //console.warn('switched pageDomain to ' + requestedDomain + ' because initator is empty or "null"', details.initator);
+    }
+
+    var request = {
+        tabId: tabId,
+        requestId: requestId,
+        startTime: details.timeStamp,
+        requestDomain: requestDomain
+    };
+    // request domain === page domain
+    request.isFirstPartyRequest = isFirstPartyRequest(requestDomain, state[tabId].pageDomain);
+
+    // requesting a known tracking service or undefined
+    request.service = lookup(services, requestDomain);
+
+    // true when this is a service and it is allowed within the domain matching rules
+    request.isAllowedServiceRequest = request.service ? isAllowedServiceRequest(request.service, state[tabId].pageDomain) : false;
+
+    return request;
+}
+
+
 function blockedEventData(req) {
     return {
         tabId: req.tabId,
-        siteName: req.siteName,
+        requestDomain: req.requestDomain,
         blockedTime: req.startTime
     };
 }
 
 function blockedTrackingServiceEvent(req) {
     var data = blockedEventData(req),
-        service = services[req.serviceId];
+        service = services[req.service];
 
     return {
         type: 'blockedTrackingService',
@@ -247,7 +261,7 @@ function getDomain(url) {
  * try to match server names in both directions, because we cannot be sure
  * whether we are loading twitter.com, www.twitter.com, or api.twitter.com
  */
-function fuzzyContains(a, b) {
+function looseContains(a, b) {
     if (!(a && b)) return false;
     if ((a.length >= b.length && a.indexOf(b) >= 0) || b.indexOf(a) >= 0) {
         return true; // request is calling back to the origin, e.g. first-party
@@ -258,18 +272,23 @@ function fuzzyContains(a, b) {
 
 function isFirstPartyRequest(domain, pageDomain) {
     if (!domain) throw new Error('Must provide domain');
-    return fuzzyContains(domain, pageDomain);
+    return looseContains(domain, pageDomain);
 }
 
-function isAllowedServiceRequest(serviceId, pageDomain) {
-    if (!serviceId || !services.hasOwnProperty(serviceId)) {
+function isAllowedServiceRequest(service, pageDomain) {
+    if (!service || !services.hasOwnProperty(service)) {
         return false;
     }
     // is this a request calling back to an allowed url of a first-party service provider?
-    var serviceDefinition = services[serviceId],
-        serviceDomain = getDomain(serviceDefinition.url);
+    var serviceDefinition = services[service];
+    // find out whether serviceDomain of request and pageDomain each map to the same service
+    var firstPartyService = lookup(services, pageDomain);
 
-    return fuzzyContains(serviceDomain, pageDomain);
+    if(!firstPartyService) {
+        return false;
+    }
+
+    return areEqual(serviceDefinition, services[firstPartyService]);
 }
 
 // TODO: add a callback instead of return value
