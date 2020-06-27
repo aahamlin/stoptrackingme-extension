@@ -14,7 +14,7 @@
         "watch": "karma start --auto-watch --debug --browsers ChromiumHeadless karma.conf.js"
     },
     "author": "Andrew Hamlin <aahamlin@gmail.com>",
-    "license": "ISC",
+    "license": "CC-BY-NC-SA-4.0",
     "repository": {
         "type": "git",
         "url": "https://github.com/aahamlin/stoptrackingme-extension.git"
