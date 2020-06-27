@@ -5,8 +5,8 @@ import Browser
 import Chart exposing (chart)
 import Dict exposing (Dict)
 import History exposing (..)
-import Html exposing (Html, div, footer, h1, h2, h3, ol, p, span, table, tbody, td, text, th, thead, tr, ul)
-import Html.Attributes exposing (class)
+import Html exposing (Html, div, footer, h1, h2, h3, img, ol, p, span, table, tbody, td, text, th, thead, tr, ul)
+import Html.Attributes exposing (class, src)
 import Json.Decode as Decode exposing (Decoder, Error(..), Value, decodeValue)
 import Json.Decode.Extra exposing (dict2)
 import Task
@@ -109,12 +109,18 @@ emptyWeekFrom key =
 view : Model -> Html Msg
 view model =
     div []
-        [ h1 [] [ text "Stop Tracking Me" ]
-        , h2 [] [ text "Recent tracking activity" ]
+        [ viewHeader
         , viewHistoryOrError model
         , viewFooter model
         ]
 
+viewHeader : Html Msg
+viewHeader =
+    div [ class "header" ]
+        [ img [ class "logo", src "icons/logo64x64.png" ] []
+        , h1 [] [ text "Stop Tracking Me" ]
+        , h2 [] [ text "Recent tracking activity" ]
+        ]
 
 viewFooter : Model -> Html Msg
 viewFooter m =

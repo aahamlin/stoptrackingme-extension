@@ -31,11 +31,14 @@ path.domain ~ g.tick, g.legend text {
 
 h1 {
     color: #399E5A;
-    text-align: center;
-    margin: 8px;
+    margin-top: 5px;
 }
 
-p, h2, h3, h4, h5, h6 {
+h1, h2, h3, h4, h5, h6 {
+    font-weight: 500;
+}
+
+p {
     text-align: center;
 }
 
@@ -61,4 +64,21 @@ footer {
 
 .container {
     margin: 10 10 20 10;
+}
+
+.header {
+    width: 100%;
+}
+
+.logo {
+    display: inline;
+    border-radius: 50%;
+    /*border: 3px solid #399E5A;*/
+    float: left;
+    margin: 0px 30px 5px 30px;
+    width: 64px;
+}
+
+.header h1, .header h2 {
+    margin-left: 30px;
 }
