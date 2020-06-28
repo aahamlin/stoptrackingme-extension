@@ -63,16 +63,28 @@ footer {
 }
 
 .header {
-    width: 100%;
+    display: block;
+    text-align: center;
 }
 
 .logo {
-    display: inline;
-    float: left;
     margin: 0px 5px;
     width: 32px;
+    vertical-align: middle;
 }
 
 .header h1, .header h2 {
+    display: inline-block;
     margin-left: 5px;
+    vertical-align: middle;
+}
+
+footer img {
+    margin-top: -4px;
+    border-radius: 50%;
+    border: 1px solid #399E5A;
+}
+
+.pull-right {
+    float: right;
 }

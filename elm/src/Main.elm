@@ -1,14 +1,15 @@
 port module Main exposing (main)
 
+--import Json.Decode.Extra exposing (dict2)
+
 import Array
 import Browser
 import Chart exposing (chart)
-import Dict exposing (Dict)
-import History exposing (..)
-import Html exposing (Html, div, footer, h1, h2, h3, img, ol, p, span, table, tbody, td, text, th, thead, tr, ul)
-import Html.Attributes exposing (class, src)
-import Json.Decode as Decode exposing (Decoder, Error(..), Value, decodeValue)
-import Json.Decode.Extra exposing (dict2)
+import Dict
+import History exposing (HistoryModel, dateFormat, dateLongFormat, historyDecoder, mergeHistory)
+import Html exposing (Html, a, div, footer, h1, h3, img, p, span, table, tbody, td, text, th, thead, tr)
+import Html.Attributes exposing (class, href, src)
+import Json.Decode exposing (Error(..), Value, decodeValue)
 import Task
 import Time exposing (millisToPosix, posixToMillis)
 
@@ -50,10 +51,6 @@ type Msg
     | GotCurrentTimeMsg Time.Posix
 
 
-
---    | GotTimeZoneMsg Time.Zone
-
-
 update : Msg -> Model -> ( Model, Cmd Msg )
 update msg model =
     case msg of
@@ -74,11 +71,6 @@ update msg model =
                     emptyWeekFrom key
             in
             ( { model | todayKey = key, history = history }, Cmd.none )
-
-
-
--- GotTimeZoneMsg zone ->
---     ( { model | timeZone = zone }, Cmd.none )
 
 
 subscriptions : Model -> Sub Msg
@@ -111,24 +103,26 @@ view model =
     div []
         [ viewHeader
         , viewHistoryOrError model
-        , viewFooter model
+        , viewFooter
         ]
+
 
 viewHeader : Html Msg
 viewHeader =
     div [ class "header" ]
-        [ img [ class "logo", src "icons/logo64x64.png" ] []
+        [ img [ class "logo", src "icons/logo48x48.png" ] []
         , h1 [] [ text "Stop Tracking Me" ]
-        --, h2 [] [ text "Recent tracking activity" ]
         ]
 
-viewFooter : Model -> Html Msg
-viewFooter m =
-    let
-        dateStr =
-            dateLongFormat m.timeZone (millisToPosix m.todayKey)
-    in
-    footer [] [ text ("Days recorded in UTC. Today is " ++ dateStr ++ ".") ]
+
+viewFooter : Html Msg
+viewFooter =
+    footer []
+        [ text "License: "
+        , a [ href "https://creativecommons.org/licenses/by-nc-sa/4.0/" ]
+            [ text "https://creativecommons.org/licenses/by-nc-sa/4.0/" ]
+        , img [ class "pull-right", src "icons/logo16x16.png" ] []
+        ]
 
 
 viewHistoryOrError : Model -> Html Msg
@@ -163,10 +157,15 @@ viewError error =
 
 viewHistory : Model -> Html Msg
 viewHistory m =
+    let
+        dateStr =
+            dateLongFormat m.timeZone (millisToPosix m.todayKey)
+    in
     div []
         [ div [ class "container" ] [ chart { history = m.history, timeZone = m.timeZone } ]
         , div [ class "container" ] [ drawDataTable m ]
         , p [] [ text "Displaying all tracking activity blocked by category over past 7 days." ]
+        , p [] [ text ("Days recorded in UTC. Today is " ++ dateStr ++ ".") ]
         ]
 
 
