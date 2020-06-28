@@ -1,7 +1,6 @@
 /*
 ** Color palette
 ** Black coffee:      #3B3333;
-** Baby powder:       #FBFEF9;
 ** Eerie black:       #1C1919;
 ** Dark Jungle Green: #192121;
 ** Dim grey:          #666666;
@@ -11,27 +10,24 @@
 html {
     margin: 0;
     padding: 0;
-    border-top: 3px solid #399E5A;
 }
 
 body {
     width: 500px;
-    margin: 3px 5px;
     font-family: Helvetica, Arial, sans-serif;
     color: #3B3333;
-    background-color: #FBFEF9;
-    font-size: 12px;
+    background-color: #FAFAFA;
+    font-size: 13px;
     font-weight: 400;
 }
 
 /* stylize the svg elements */
 path.domain ~ g.tick, g.legend text {
-    font-size: 1.5em;
+    font-size: 17px;
 }
 
 h1 {
     color: #399E5A;
-    margin-top: 5px;
 }
 
 h1, h2, h3, h4, h5, h6 {
@@ -72,13 +68,11 @@ footer {
 
 .logo {
     display: inline;
-    border-radius: 50%;
-    /*border: 3px solid #399E5A;*/
     float: left;
-    margin: 0px 30px 5px 30px;
-    width: 64px;
+    margin: 0px 5px;
+    width: 32px;
 }
 
 .header h1, .header h2 {
-    margin-left: 30px;
+    margin-left: 5px;
 }

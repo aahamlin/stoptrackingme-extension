@@ -119,7 +119,7 @@ viewHeader =
     div [ class "header" ]
         [ img [ class "logo", src "icons/logo64x64.png" ] []
         , h1 [] [ text "Stop Tracking Me" ]
-        , h2 [] [ text "Recent tracking activity" ]
+        --, h2 [] [ text "Recent tracking activity" ]
         ]
 
 viewFooter : Model -> Html Msg
