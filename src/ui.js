@@ -1,28 +1,20 @@
 import browser from './browser.js';
-import state from './state_provider.js';
+import { EventType } from './requestHandler.js';
 
 const badgeColor = '#399E5A';
 
 export function handleBlockingEvent(event) {
     const { type, data } = event;
 
-    if(!state.hasOwnProperty(data.tabId)) {
+    if (type !== EventType) {
         return;
     }
-    if (type === 'blockedTrackingService' || type === 'blockedThirdPartyCookie') {
-        state[data.tabId].totalCount += 1;
-        showTotal(state[data.tabId].totalCount.toString(),
-                  data.tabId);
-
-    }
-    else  {
-        console.log('event type not handled: ' + type, data);
-    }
+    showTotal(data.totalCount, data.tabId);
 };
 
 
-export function showTotal(str, tabId) {
-    var data = { text: str },
+function showTotal(count, tabId) {
+    var data = { text: count.toString() },
         color = { color: badgeColor };
 
     if(tabId) {
@@ -38,4 +30,4 @@ export function showTotal(str, tabId) {
 };
 
 
-export { showTotal as default };
+export { handleBlockingEvent as default };

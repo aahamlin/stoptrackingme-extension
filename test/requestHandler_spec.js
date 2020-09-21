@@ -1,24 +1,29 @@
 import testData from './helpers/testData.js';
 import * as testUtils from './helpers/testUtils.js';
 import { configureServices } from '../src/services.js';
-import state from '../src/state_provider.js';
-import {
-    registerTrackingServices,
-    registerEventSinks,
-    addTab,
-    updateTab,
-    removeTab,
-    replaceTab,
-    beginRequest,
-    handleSendHeaders,
-    handleHeadersReceived,
-    endRequest,
-    handleError
-} from '../src/requestHandler.js';
+//import state from '../src/state_provider.js';
+import { createRequestManager } from '../src/requestHandler.js';
+
+describe('class RequestManager', function() {
+
+    it('#ctor populates empty objects', function () {
+        var rm = createRequestManager();
+        expect(rm.services).to.be.empty;
+        expect(rm.state).to.be.empty;
+    });
+
+    it('#ctor uses supplied objects', function() {
+        var services = { 'foo': 1 },
+            state = { 'bar': 1 }
+        var rm = createRequestManager(services, state);
+        expect(rm.services).to.equal(services);
+        expect(rm.state).to.equal(state);
+    });
+});
 
 describe('requestHandler', function() {
 
-    var eventSpy, errorSpy;
+    var requestManager, services, state, eventSpy, errorSpy;
 
     const detailsOfTracker = {
         tabId: 1,
@@ -57,14 +62,13 @@ describe('requestHandler', function() {
     };
 
     beforeEach(function() {
-        registerTrackingServices(
-            configureServices(testData));
+
+        state = {};
+        services = configureServices(testData);
 
         // todo use spies
         eventSpy = sinon.spy();
         errorSpy = sinon.spy();
-
-        registerEventSinks({ add: eventSpy }, { add: errorSpy });
 
         testUtils.updateState(state, {
             '1': {
@@ -73,29 +77,37 @@ describe('requestHandler', function() {
                 pageDomain: 'www.initiator.com',
             }
         });
+
+        requestManager = createRequestManager(
+            services, state);
+        requestManager.registerEventSinks(
+            { add: eventSpy }, { add: errorSpy });
+
+
     });
 
     afterEach(function() {
-        testUtils.clearAllProps(state);
+        //testUtils.clearAllProps(state);
+        //resetTrackingServices();
         // some tests have to change these values, make sure use a copy
         expect(detailsOfNonTracker.initiator).to.be.equal('https://www.initiator.com/');
         expect(detailsOfTracker.initiator).to.be.equal('https://www.initiator.com/');
     });
 
     it('#addTab creates state[tabId]', function() {
-        addTab({ tabId: 2 });
+        requestManager.addTab({ tabId: 2 });
         expect(state).to.have.property('2');
     });
 
     it('#updateTab sets state#pageDomain', function() {
         //'https://www.initiator.com/'
         var tabInfo = { url: 'https://www.changedurl.com' };
-        updateTab(1, tabInfo, tabInfo);
+        requestManager.updateTab(1, tabInfo, tabInfo);
         expect(state[1]).to.have.property('pageDomain', 'www.changedurl.com');
     });
 
     it('#removeTab removes state[tabId]', function() {
-        removeTab(1);
+        requestManager.removeTab(1);
         expect(state.hasOwnProperty(1)).to.be.false;
     });
 
@@ -109,7 +121,7 @@ describe('requestHandler', function() {
                 }
             }
         });
-        replaceTab(2, 1);
+        requestManager.replaceTab(2, 1);
         expect(state[2]).to.have.property('requests');
         expect(state[2].requests).to.include.property(
             detailsOfTracker.requestId);
@@ -119,25 +131,25 @@ describe('requestHandler', function() {
     it('#beginRequest() updates state#pageDomain', function() {
         var details = testUtils.merge({}, detailsOfNonTracker);
         details.initiator = undefined;
-        beginRequest(details);
+        requestManager.beginRequest(details);
         expect(state[detailsOfTracker.tabId]).to.have.property('pageDomain', 'www.safeurl.com');
     });
 
 
     it('#beginRequest() stores requestId in state', function() {
-        beginRequest(detailsOfNonTracker);
+        requestManager.beginRequest(detailsOfNonTracker);
         expect(state[detailsOfNonTracker.tabId].requests).to.have.property(detailsOfNonTracker.requestId);
     });
 
     it('#beginRequest() cancels third-party tracking service request', function() {
-        var ret = beginRequest(detailsOfTracker);
+        var ret = requestManager.beginRequest(detailsOfTracker);
         expect(ret).to.have.property('cancel', true);
     });
 
     it('#beginRequest() does not cancel first-party service request https://63squares.com', function() {
         var details = testUtils.merge({}, detailsOfTracker);
         details.initiator = undefined; //'http://63squares.com';
-        var ret = beginRequest(details);
+        var ret = requestManager.beginRequest(details);
         expect(ret).to.be.undefined;
     });
 
@@ -145,7 +157,7 @@ describe('requestHandler', function() {
         var details = testUtils.merge({}, detailsOfTracker);
         details.initiator = 'null'; // sets first party to clearspring.com
         details.url = 'https://www.clearspring.com';
-        var ret = beginRequest(details);
+        var ret = requestManager.beginRequest(details);
         expect(ret).to.be.undefined;
     });
 
@@ -156,27 +168,27 @@ describe('requestHandler', function() {
         var details = testUtils.merge({}, detailsOfTracker);
         details.initiator = 'https://www.addthiscdn.com'; //first-party of AddThis service
         details.url = 'https://www.clearspring.com'; // third-party of AddThis service
-        var ret = beginRequest(details);
+        var ret = requestManager.beginRequest(details);
         expect(ret).to.be.undefined;
     });
 
 
     it('#beginRequest() does not cancel non-tracking request', function() {
-        var ret = beginRequest(detailsOfNonTracker);
+        var ret = requestManager.beginRequest(detailsOfNonTracker);
         expect(ret).to.be.undefined;
     });
 
     it('#handleSendHeaders() does not remove first-party cookies', function () {
         var details = testUtils.merge({}, detailsOfNonTracker);
         details.initiator = undefined;
-        beginRequest(details);
-        var res = handleSendHeaders(details);
+        requestManager.beginRequest(details);
+        var res = requestManager.handleSendHeaders(details);
         expect(res).to.be.undefined;
     });
 
     it('#handleSendHeaders() removes third-party cookies', function() {
-        beginRequest(detailsOfNonTracker);
-        var res = handleSendHeaders(detailsOfNonTracker);
+        requestManager.beginRequest(detailsOfNonTracker);
+        var res = requestManager.handleSendHeaders(detailsOfNonTracker);
         expect(res).to.be.an('object');
         expect(res).to.have.property('requestHeaders');
         expect(res.requestHeaders).to.include.deep.members([detailsOfTracker.requestHeaders[0]])
@@ -187,9 +199,9 @@ describe('requestHandler', function() {
     it('#handleSendHeaders() does not remove cookies from first-party service request to http://63squares.com', function() {
         var details = testUtils.merge({}, detailsOfTracker);
         details.initiator = undefined; //'http://63squares.com';
-        var ret = beginRequest(details);
+        var ret = requestManager.beginRequest(details);
         expect(ret).to.be.undefined;
-        expect(handleSendHeaders(details)).to.be.undefined;
+        expect(requestManager.handleSendHeaders(details)).to.be.undefined;
     });
 
     it('#handleSendHeaders() does not remove third-party cookies from first-party services', function() {
@@ -199,22 +211,22 @@ describe('requestHandler', function() {
         var details = testUtils.merge({}, detailsOfTracker);
         details.initiator = 'null';
         details.url = 'https://www.i-stats.com/service';
-        var ret = beginRequest(details);
+        var ret = requestManager.beginRequest(details);
         expect(ret).to.be.undefined;
-        expect(handleSendHeaders(details)).to.be.undefined;
+        expect(requestManager.handleSendHeaders(details)).to.be.undefined;
     });
 
     it('#handleHeadersReceived() does not remove first-party cookies', function () {
         var details = testUtils.merge({}, detailsOfNonTracker);
         details.initiator = undefined;
-        beginRequest(details);
-        var res = handleHeadersReceived(details);
+        requestManager.beginRequest(details);
+        var res = requestManager.handleHeadersReceived(details);
         expect(res).to.be.undefined;
     });
 
     it('#handleHeadersReceived() removes third-party set-cookies', function() {
-        beginRequest(detailsOfNonTracker);
-        var res = handleHeadersReceived(detailsOfNonTracker);
+        requestManager.beginRequest(detailsOfNonTracker);
+        var res = requestManager.handleHeadersReceived(detailsOfNonTracker);
         expect(res).to.be.an('object');
         expect(res).to.have.property('responseHeaders');
         expect(res.responseHeaders).to.include.deep.members([
@@ -230,9 +242,9 @@ describe('requestHandler', function() {
     it('#handleHeadersReceived() does not remove set-cookies from first-party service request to http://63squares.com', function() {
         var details = testUtils.merge({}, detailsOfTracker);
         details.initiator = undefined; //'http://63squares.com';
-        var ret = beginRequest(details);
+        var ret = requestManager.beginRequest(details);
         expect(ret).to.be.undefined;
-        expect(handleHeadersReceived(details)).to.be.undefined;
+        expect(requestManager.handleHeadersReceived(details)).to.be.undefined;
     });
 
     it('#handleHeadersReceived() does not remove third-party set-cookies from first-party services', function() {
@@ -242,10 +254,11 @@ describe('requestHandler', function() {
         var details = testUtils.merge({}, detailsOfTracker);
         details.initiator = 'null';
         details.url = 'https://www.i-stats.com/service';
-        var ret = beginRequest(details);
+        var ret = requestManager.beginRequest(details);
         expect(ret).to.be.undefined;
-        expect(handleHeadersReceived(details)).to.be.undefined;
+        expect(requestManager.handleHeadersReceived(details)).to.be.undefined;
     });
+
 
     it('#endRequest() removes requestId from state', function() {
         var reqState = {};
@@ -261,7 +274,7 @@ describe('requestHandler', function() {
         };
 
         testUtils.updateState(state, { 1: { requests: reqState } });
-        endRequest(detailsOfTracker);
+        requestManager.endRequest(detailsOfTracker);
         expect(state[detailsOfTracker.tabId].requests).to.not.have.property(detailsOfTracker.requestId);
         expect(state[detailsOfNonTracker.tabId].requests).to.have.property(detailsOfNonTracker.requestId);
     });
@@ -269,10 +282,10 @@ describe('requestHandler', function() {
 
     it('#endRequest emits blocked cookie event', function() {
         var details = testUtils.merge({}, detailsOfNonTracker);
-        beginRequest(details);
-        handleSendHeaders(details);
-        handleHeadersReceived(details);
-        endRequest(details);
+        requestManager.beginRequest(details);
+        requestManager.handleSendHeaders(details);
+        requestManager.handleHeadersReceived(details);
+        requestManager.endRequest(details);
         expect(eventSpy.calledOnce).to.be.true;
     });
 
@@ -290,17 +303,17 @@ describe('requestHandler', function() {
         };
 
         testUtils.updateState(state, { 1: { requests: reqState } });
-        handleError(detailsOfTracker);
+        requestManager.handleError(detailsOfTracker);
         expect(state[detailsOfTracker.tabId].requests).to.not.have.property(detailsOfTracker.requestId);
         expect(state[detailsOfNonTracker.tabId].requests).to.have.property(detailsOfNonTracker.requestId);
     });
 
     it('#handleError emits blocked tracker event', function() {
         var details = testUtils.merge({}, detailsOfTracker);
-        beginRequest(details);
-        handleSendHeaders(details);
-        handleHeadersReceived(details);
-        handleError(details);
+        requestManager.beginRequest(details);
+        requestManager.handleSendHeaders(details);
+        requestManager.handleHeadersReceived(details);
+        requestManager.handleError(details);
         expect(eventSpy.calledOnce).to.be.true;
     });
 
@@ -315,7 +328,7 @@ describe('requestHandler', function() {
         };
 
         testUtils.updateState(state, { 1: { requests: reqState } });
-        handleError(errorDetails);
+        requestManager.handleError(errorDetails);
         expect(errorSpy.calledOnce).to.be.true;
     });
 

@@ -1,15 +1,16 @@
 import browser from './browser.js';
-import { history } from './state_provider.js';
+import { EventType } from './requestHandler.js';
+//import { history } from './state_provider.js';
 
 export const MILLIS_PER_DAY = 86400000;
 
+export const history = {};
+
 export function loadHistory() {
     var dateKey = asDateKey(Date.now());
-    //console.log('loading history for ' + new Date(parseInt(dateKey)), dateKey);
     return new Promise((resolve, reject) => {
         browser.storage.local.get(dateKey, function (result) {
             if (browser.runtime.lastError) {
-                //reject(browser.runtime.lastError.message);
                 console.warn(browser.runtime.lastError.message);
             }
             //console.log('found ' + dateKey + ' = ' + JSON.stringify(result[dateKey]));
@@ -21,7 +22,9 @@ export function loadHistory() {
 
 export function saveHistory() {
     browser.storage.local.set(history, function () {
-        if(browser.runtime.lastError) console.warn(browser.runtime.lastError.message);
+        if(browser.runtime.lastError) {
+            console.warn(browser.runtime.lastError.message);
+        }
         //console.log('saved history ' + JSON.stringify(history));
     });
 }
@@ -38,19 +41,15 @@ export function saveHistory() {
 export function handleBlockingEvent(event) {
     const { type, data } = event;
 
+    if (type !== EventType) {
+        return;
+    }
+
     var dateKey = asDateKey(data.blockedTime),
         today = history[dateKey] || [0,0,0,0,0,0,0,0];
 
-    if (type === 'blockedTrackingService') {
-        today = incrementCount(today, data.category);
-    }
-    else if (type === 'blockedThirdPartyCookie') {
-        today = incrementCount(today, 'Cookie');
-    }
-    else  {
-        //console.log('event type not handled: ' + type, data);
-        return;
-    }
+    today = incrementCount(today, data.category);
+
     history[dateKey] = today;
     saveHistory();
 };

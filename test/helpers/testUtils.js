@@ -8,7 +8,6 @@ export function clearAllProps(data) {
 function deep_copy(source) {
     var outResult, item;
 
-    console.log('deep_copy', source);
     if(typeof source !== 'object' || source === null) {
         return source;
     }
@@ -47,7 +46,6 @@ export function merge(target, source) {
         }
     }
 
-    console.log('merged target:source', target, source);
     return outTarget;
 }
 

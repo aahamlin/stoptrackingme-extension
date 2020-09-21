@@ -1,36 +1,36 @@
-import * as testUtils from './helpers/testUtils.js';
 import browser from '../src/browser.js';
-import state from '../src/state_provider.js';
-import setBadgeText, { handleBlockingEvent } from '../src/ui.js';
+import { EventType } from '../src/requestHandler.js';
+import handleBlockingEvent from '../src/ui.js';
 
 describe('ui', function () {
-    var spyOnBrowserAction;
+    var spySetBadgeText, spySetBgColor;
 
     beforeEach(function() {
-        spyOnBrowserAction = sinon.spy();
+        spySetBadgeText = sinon.spy();
+        spySetBgColor = sinon.spy();
         Object.assign(browser.browserAction, {
-            setBadgeText: spyOnBrowserAction,
-            setBadgeBackgroundColor: spyOnBrowserAction,
+            setBadgeText: spySetBadgeText,
+            setBadgeBackgroundColor: spySetBgColor,
         });
     });
 
     afterEach(function() {
-        testUtils.clearAllProps(state);
         sinon.restore();
     });
 
-    it('#setBadgeText() sends object with text property', function () {
-        setBadgeText('1');
-        expect(spyOnBrowserAction.calledWith({text:'1'})).to.be.true;
-        expect(spyOnBrowserAction.calledWith({color: sinon.match.string})).to.be.true;
+    it('#handleBlockingEvent updates badge text', function () {
+        handleBlockingEvent({ type: EventType, data: { tabId: 1, totalCount: 2 }});
+        sinon.assert.calledWith(spySetBadgeText, sinon.match.has("text", "2"));
     });
 
-    it('#handleBlockingEvent updates badge text', function () {
-        // TODO move updateState into testUtils
-        testUtils.updateState(state, { 1: { totalCount: 0 }});
-        handleBlockingEvent({ type: 'blockedTrackingService', data: { tabId: 1 }});
-        handleBlockingEvent({ type: 'blockedThirdPartyCookie', data: { tabId: 1 }});
-        handleBlockingEvent({ type: 'unknownType', data: { tabId: 1 }});
-        sinon.assert.callCount(spyOnBrowserAction, 4);
+    it('#handleBlockingEvent updates badge color', function () {
+        handleBlockingEvent({ type: EventType, data: { tabId: 1, totalCount: 2 }});
+        sinon.assert.calledWith(spySetBgColor, sinon.match.has("color", sinon.match.string));
+    });
+
+    it('#handleBlockingEvent ignores other events', function () {
+        handleBlockingEvent({ type: 'foo', data: 1 });
+        sinon.assert.notCalled(spySetBadgeText);
+        sinon.assert.notCalled(spySetBgColor);
     });
 });

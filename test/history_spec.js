@@ -1,7 +1,12 @@
 import * as testUtils from './helpers/testUtils.js';
 import browser from '../src/browser.js';
-import { history } from '../src/state_provider.js';
-import { asDateKey, loadHistory, saveHistory, handleBlockingEvent } from '../src/history.js';
+import { EventType } from '../src/requestHandler.js';
+//import { history } from '../src/state_provider.js';
+import { asDateKey,
+         loadHistory, saveHistory,
+         handleBlockingEvent,
+         history
+       } from '../src/history.js';
 
 
 describe('history', function () {
@@ -45,7 +50,7 @@ describe('history', function () {
             historyToday = {};
 
         historyToday[dateKey] = { 'cookie': 5 };
-        browser.storage.local.get = function(key, cb) {
+        browser.storage.local.get = function(_, cb) {
             cb(historyToday);
         };
         loadHistory().then(
@@ -65,31 +70,8 @@ describe('history', function () {
         expect(fake.calledOnce).to.be.true;
     });
 
-    it('#handleBlockingEvent() increment from existing history value', function () {
-        var timeStamp = Date.now(),
-            dateKey = asDateKey(timeStamp);
-
-        var old = {};
-        old[dateKey] = [1,0,0,0,0,0,0,0];
-        testUtils.updateState(history, old);
-        handleBlockingEvent({ type: 'blockedThirdPartyCookie', data: { blockedTime: timeStamp } });
-        expect(history).to.have.property(dateKey);
-        expect(history[dateKey]).to.be.an('array').and.have.length(8)
-            .and.to.include.ordered.members([2,0,0,0,0,0,0,0]);
-    });
-
-    it('#handleBlockingEvent() increments Cookies, twice', function() {
-        var timeStamp = Date.now(),
-            dateKey = asDateKey(timeStamp);
-
-        handleBlockingEvent({ type: 'blockedThirdPartyCookie', data: { blockedTime: timeStamp } });
-        handleBlockingEvent({ type: 'blockedThirdPartyCookie', data: { blockedTime: timeStamp } });
-        expect(history).to.have.property(dateKey);
-        expect(history[dateKey]).to.be.an('array').and.have.length(8)
-            .and.to.include.ordered.members([2,0,0,0,0,0,0,0]);
-    });
-
     var categoryTests = [
+        {cat: 'Cookie', index: 0},
         {cat: "Advertising", index: 1},
         {cat: "Analytics", index: 2},
         {cat: "Content", index: 3},
@@ -108,10 +90,11 @@ describe('history', function () {
                    dateKey = asDateKey(timeStamp),
                    testarray = [0,0,0,0,0,0,0,0];
 
-               testarray[test.index] = 1;
+               testarray[test.index] += 1;
                handleBlockingEvent.apply(null, [{
-                   type: 'blockedTrackingService',
-                   data: { category: test.cat, blockedTime: timeStamp
+                   type: EventType,
+                   data: { category: test.cat,
+                           blockedTime: timeStamp
                          }
                }]);
                expect(history).to.have.property(dateKey);

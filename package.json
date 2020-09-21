@@ -8,9 +8,10 @@
         "start": "webpack-dev-server --mode=development --port=3000",
         "test": "karma start --single-run --browsers ChromiumHeadless karma.conf.js && pushd elm && elm-test && popd",
         "test:chrome": "karma start --single-run --browsers ChromeHeadless karma.conf.js && pushd elm && elm-test && popd",
-        "test:firefox": "karma start --single-run --browsers FirefoxHeadless karma.conf.js",
+        "test:firefox": "karma start --single-run --browsers FirefoxHeadless karma.conf.js && pushd elm && elm-test && popd",
         "debug": "karma start --debug --single-run=false --browsers Chromium karma.conf.js",
         "debug:chrome": "karma start --debug --single-run=false --browsers Chrome karma.conf.js",
+        "debug:firefox": "karma start --debug --single-run=false --browsers Firefox karma.conf.js",      
         "watch": "karma start --auto-watch --debug --browsers ChromiumHeadless karma.conf.js"
     },
     "author": "Andrew Hamlin <aahamlin@gmail.com>",
