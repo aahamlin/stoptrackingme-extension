@@ -6,6 +6,7 @@ export const MILLIS_PER_DAY = 86400000;
 
 export const history = {};
 
+// TODO phase 2: history is changing from a summary of a day individual events.
 export function loadHistory() {
     var dateKey = asDateKey(Date.now());
     return new Promise((resolve, reject) => {
@@ -20,7 +21,7 @@ export function loadHistory() {
     });
 }
 
-export function saveHistory() {
+export function saveHistory(history) {
     browser.storage.local.set(history, function () {
         if(browser.runtime.lastError) {
             console.warn(browser.runtime.lastError.message);
@@ -51,7 +52,10 @@ export function handleBlockingEvent(event) {
     today = incrementCount(today, data.category);
 
     history[dateKey] = today;
-    saveHistory();
+
+    // save history every second until page settles
+    
+    saveHistory(history);
 };
 
 function incrementCount(today, categoryName) {
