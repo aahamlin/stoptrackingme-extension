@@ -1,6 +1,6 @@
 import { EventType } from './requestHandler.js';
 import CACHE from './cache.js';
-import { saveHistory } from './storage.js';
+import { loadHistory, saveHistory } from './storage.js';
 
 // goal of this refactor is to save history differently allowing the UI to display in local timezone
 // timezones can be wicked, hour and half-hour must be accounted for. Therefore, we can save the
@@ -18,7 +18,17 @@ import { saveHistory } from './storage.js';
     //browser.tabs.onUpdated.addListener(saveHistory);
 });*/
 
-
+export function initHistory() {
+    return new Promise((resolve, _) => {
+        loadHistory()
+            .then(stored => {
+                for(var key in stored) {
+                    CACHE.set(key, stored[key]);
+                }
+                resolve();
+            });
+    });
+}
 
 export const MILLIS_PER_DAY = 86400000;
 

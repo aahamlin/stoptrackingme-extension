@@ -24,13 +24,12 @@ describe('#retrieval tests', function() {
             historyToday = {};
 
         historyToday[dateKey] = [5,0,0,0,0,0,0,0];
-        browser.storage.local.get = function(dk, cb) {
-            expect(dk).to.equal(dateKey);
+        browser.storage.local.get = function(_, cb) {
             cb(historyToday);
         };
 
         // TODO this is not testing that call args to storage.local.get.
-        loadHistory(dateKey).then(
+        loadHistory().then(
             function (result) {
                 expect(result).to.deep.equal(historyToday);
                 done();

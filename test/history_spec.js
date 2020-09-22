@@ -1,6 +1,7 @@
 import browser from '../src/browser.js';
 import { EventType } from '../src/requestHandler.js';
-import { asDateKey, handleBlockingEvent } from '../src/history.js';
+import { loadHistory } from '../src/storage.js';
+import { asDateKey, initHistory, handleBlockingEvent } from '../src/history.js';
 import CACHE from '../src/cache.js';
 
 describe('history', function () {
@@ -18,6 +19,38 @@ describe('history', function () {
         var res = asDateKey(utcJun18.getTime());
         expect(res).to.be.an('string').and.equal(jun18Key);
 
+    });
+
+    describe('#initHistory', function() {
+
+        beforeEach(function() {
+
+            Object.assign(browser.storage, {
+                local: {
+                    get: (_, cb) => {
+                        cb({'key1': 'value1'});
+                    }
+                }
+            });
+        });
+
+        afterEach(function() {
+            delete browser.storage.local.get;
+            sinon.restore();
+        });
+
+        it('stores return value in cache', function(done) {
+            // TODO needs to return a Promise for testing...
+            initHistory().then(
+                function(_) {
+                    // TODO check CACHE for keys
+                    expect(CACHE.keys()).to.have.members(['key1']);
+                    done();
+                })
+                .catch(function(err) {
+                    done(err);
+                });
+        });
     });
 
     describe('#handleBlockingEvent', function () {

@@ -4,11 +4,16 @@ import { initTrackingServices } from './services.js';
 import requestManager from './requestHandler.js';
 import { eventStream, errorStream } from './streams.js';
 import { handleBlockingEvent } from './ui.js';
-import { handleBlockingEvent as handleHistoryEvent } from './history.js';
+import {
+    initHistory,
+    handleBlockingEvent as handleHistoryEvent
+} from './history.js';
 
 const netFilters = {
     urls: ['https://*/*', 'http://*/*'],
 };
+
+initHistory();
 
 initTrackingServices().then(registerExtensionListeners);
 
