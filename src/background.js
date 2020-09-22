@@ -28,25 +28,25 @@ function registerExtensionListeners(trackingServices) {
         var tabId;
         for (let i = 0; i < tabs.length; i++) {
             tabId = tabs[i].id;
-            rm.addTab.call(rm, { tabId: tabId });
-            rm.updateTab.call(rm, tabId, { url: tabs[i].url }, tabs[i]);
+            rm.addTab({ tabId: tabId });
+            rm.updateTab(tabId, { url: tabs[i].url }, tabs[i]);
         }
     });
 
-    browser.tabs.onActivated.addListener(rm.addTab.bind(rm));
-    browser.tabs.onUpdated.addListener(rm.updateTab.bind(rm));
-    browser.tabs.onRemoved.addListener(rm.removeTab.bind(rm));
-    browser.tabs.onReplaced.addListener(rm.replaceTab.bind(rm));
+    browser.tabs.onActivated.addListener(rm.addTab);
+    browser.tabs.onUpdated.addListener(rm.updateTab);
+    browser.tabs.onRemoved.addListener(rm.removeTab);
+    browser.tabs.onReplaced.addListener(rm.replaceTab);
 
     browser.webRequest.onBeforeRequest.addListener(
-        rm.beginRequest.bind(rm),
+        rm.beginRequest,
         netFilters,
         ['blocking']
     );
 
     try {
         browser.webRequest.onBeforeSendHeaders.addListener(
-            rm.handleSendHeaders.bind(rm),
+            rm.handleSendHeaders,
             netFilters,
             ['blocking', 'requestHeaders', 'extraHeaders']
         );
@@ -54,7 +54,7 @@ function registerExtensionListeners(trackingServices) {
     catch (e) {
         // Firefox does not support extraHeaders, while chrome requires them
         browser.webRequest.onBeforeSendHeaders.addListener(
-            rm.handleSendHeaders.bind(rm),
+            rm.handleSendHeaders,
             netFilters,
             ['blocking', 'requestHeaders']
         );
@@ -62,7 +62,7 @@ function registerExtensionListeners(trackingServices) {
 
     try {
         browser.webRequest.onHeadersReceived.addListener(
-            rm.handleHeadersReceived.bind(rm),
+            rm.handleHeadersReceived,
             netFilters,
             ['blocking', 'responseHeaders', 'extraHeaders']
         );
@@ -70,7 +70,7 @@ function registerExtensionListeners(trackingServices) {
     catch (e) {
         // firefox does not support extraHeaders, while chrome requires them
         browser.webRequest.onHeadersReceived.addListener(
-            rm.handleHeadersReceived.bind(rm),
+            rm.handleHeadersReceived,
             netFilters,
             ['blocking', 'responseHeaders']
         );
@@ -78,12 +78,12 @@ function registerExtensionListeners(trackingServices) {
 
 
     browser.webRequest.onCompleted.addListener(
-        rm.endRequest.bind(rm),
+        rm.endRequest,
         netFilters
     );
 
     browser.webRequest.onErrorOccurred.addListener(
-        rm.handleError.bind(rm),
+        rm.handleError,
         netFilters
     );
 
