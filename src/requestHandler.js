@@ -1,4 +1,9 @@
 import { lookup, areEqual } from './services.js';
+import {
+    eventSink as defaultEventSink,
+    errorSink as defaultErrorSink
+} from './streams.js';
+
 
 // options
 const opts_allowThirdPartyCookies = false;
@@ -6,196 +11,187 @@ const opts_allowThirdPartyCookies = false;
 export const EventType = 'BlockedEvent';
 
 // TODO after refactoring, can we remove the state object arg all together?
-export function createRequestManager(services, state) {
-    var state = state ? state : {},
-        services = services ? services : {};
+export function createRequestManager(svc, cfg) {
+    if (!svc) throw Error('services not provided');
 
-    return new RequestManager(state, services);
-}
+    const services = svc;
+    const state = (cfg && cfg['state']) ? cfg['state'] : {};
+    const eventSink = (cfg && cfg['events']) ? cfg['events'] : defaultEventSink;
+    const errorSink = (cfg && cfg['errors']) ? cfg['errors'] : defaultErrorSink;
 
-class RequestManager {
-
-    constructor(state, services) {
-        this.state = state || {};
-        this.services = services || {};
-    }
-
-    registerEventSinks(eventSink, errorSink) {
-        this.eventSink = eventSink;
-        this.errorSink = errorSink;
-    }
-
-    addTab(info) {
-        const { tabId } = info;
-        if(!this.state.hasOwnProperty(tabId)) {
-            this.state[tabId] = {
-                tabId: tabId,
-                requests: {},
-                totalCount: 0
-            };
-        }
-    }
-
-    updateTab(tabId, info, tab) {
-        if (!this.state.hasOwnProperty(tabId)) {
-            return;
-        }
-
-        if (info.url) {
-            if (!looseContains(tab.url, this.state[tabId].pageDomain)) {
-                this.state[tabId].pageDomain = getDomain(tab.url);
-            }
-        }
-    }
-
-    removeTab(tabId, _) {
-        if(this.state.hasOwnProperty(tabId)) {
-            delete this.state[tabId];
-        }
-    }
-
-
-    replaceTab(newTabId, oldTabId) {
-        if(this.state.hasOwnProperty(oldTabId)) {
-            this.state[newTabId] = this.state[oldTabId];
-            delete this.state[oldTabId];
-        }
-    }
-
-
-    beginRequest(details) {
-        const { tabId, requestId } = details;
-
-        if (!this.state.hasOwnProperty(tabId)) {
-            return;
-        }
-
-        // Things to know
-        // if the first party url domain matches the request domain, then allow all
-        // if request domain matches a service and the first party url domain matches
-        // the service domain or any of service's known domains, then allow because
-        // person has directly requested a known service entity
-
-        var request = this.configureRequest(details);
-
-        this.state[tabId].requests[requestId] = request;
-
-        if (request.cancelled){
-            return { cancel: true };
-        }
-    }
-
-    handleSendHeaders(details) {
-        const { tabId, requestId } = details;
-
-        var requestHeaders, request;
-
-        if (!this.state.hasOwnProperty(tabId)
-            || !this.state[tabId].requests.hasOwnProperty(requestId)) {
-            return;
-        }
-
-        request = this.state[tabId].requests[requestId];
-
-        if(!opts_allowThirdPartyCookies
-           && !request.isFirstPartyRequest
-           && !request.isAllowedServiceRequest) {
-            if(requestHeaders = stripHeaders(details.requestHeaders, 'cookie')) {
-                // TODO blockedThirdPartyCookie will be a request method
-                request.blockedThirdPartyCookie = true;
-                return {
-                    requestHeaders: requestHeaders
+    const requestManager = Object.create({
+        addTab: (info) => {
+            const { tabId } = info;
+            if(!state.hasOwnProperty(tabId)) {
+                state[tabId] = {
+                    tabId: tabId,
+                    requests: {},
+                    totalCount: 0
                 };
             }
-        }
-    }
+        },
 
-
-    handleHeadersReceived(details) {
-        const { tabId, requestId } = details;
-
-        var responseHeaders, request;
-
-        if (!this.state.hasOwnProperty(tabId)
-            || !this.state[tabId].requests.hasOwnProperty(requestId)) {
-            return;
-        }
-
-        request = this.state[tabId].requests[requestId];
-
-        if(!opts_allowThirdPartyCookies
-           && !request.isFirstPartyRequest
-           && !request.isAllowedServiceRequest) {
-
-            if(responseHeaders = stripHeaders(details.responseHeaders, 'set-cookie')) {
-                // TODO blockedThirdPartyCookie will be a request method
-                request.blockedThirdPartyCookie = true;
-                return {
-                    responseHeaders: responseHeaders
-                };
+        updateTab: (tabId, info, tab) => {
+            if (!state.hasOwnProperty(tabId)) {
+                return;
             }
+
+            if (info.url) {
+                if (!looseContains(tab.url, state[tabId].pageDomain)) {
+                    state[tabId].pageDomain = getDomain(tab.url);
+                }
+            }
+        },
+
+        removeTab: (tabId, _) => {
+            if(state.hasOwnProperty(tabId)) {
+                delete state[tabId];
+            }
+        },
+
+
+        replaceTab: (newTabId, oldTabId) => {
+            if(state.hasOwnProperty(oldTabId)) {
+                state[newTabId] = state[oldTabId];
+                delete state[oldTabId];
+            }
+        },
+
+
+        beginRequest: (details) => {
+            const { tabId, requestId } = details;
+
+            if (!state.hasOwnProperty(tabId)) {
+                return;
+            }
+
+            // Things to know
+            // if the first party url domain matches the request domain, then allow all
+            // if request domain matches a service and the first party url domain matches
+            // the service domain or any of service's known domains, then allow because
+            // person has directly requested a known service entity
+
+            var request = configureRequest(details);
+
+            state[tabId].requests[requestId] = request;
+
+            if (request.cancelled){
+                return { cancel: true };
+            }
+        },
+
+        handleSendHeaders: (details) => {
+            const { tabId, requestId } = details;
+
+            var requestHeaders, request;
+
+            if (!state.hasOwnProperty(tabId)
+                || !state[tabId].requests.hasOwnProperty(requestId)) {
+                return;
+            }
+
+            request = state[tabId].requests[requestId];
+
+            if(!opts_allowThirdPartyCookies
+               && !request.isFirstPartyRequest
+               && !request.isAllowedServiceRequest) {
+                if(requestHeaders = stripHeaders(details.requestHeaders, 'cookie')) {
+                    // TODO blockedThirdPartyCookie will be a request method
+                    request.blockedThirdPartyCookie = true;
+                    return {
+                        requestHeaders: requestHeaders
+                    };
+                }
+            }
+        },
+
+
+        handleHeadersReceived: (details) => {
+            const { tabId, requestId } = details;
+
+            var responseHeaders, request;
+
+            if (!state.hasOwnProperty(tabId)
+                || !state[tabId].requests.hasOwnProperty(requestId)) {
+                return;
+            }
+
+            request = state[tabId].requests[requestId];
+
+            if(!opts_allowThirdPartyCookies
+               && !request.isFirstPartyRequest
+               && !request.isAllowedServiceRequest) {
+
+                if(responseHeaders = stripHeaders(details.responseHeaders, 'set-cookie')) {
+                    // TODO blockedThirdPartyCookie will be a request method
+                    request.blockedThirdPartyCookie = true;
+                    return {
+                        responseHeaders: responseHeaders
+                    };
+                }
+            }
+        },
+
+
+        endRequest: (details) => {
+            const { tabId, requestId } = details;
+
+            if (!state.hasOwnProperty(tabId)
+                || !state[tabId].requests.hasOwnProperty(requestId)) {
+                return;
+            }
+
+            var request = state[tabId].requests[requestId];
+
+            if (request.blockedThirdPartyCookie) {
+                var count = incrementTabCount(tabId);
+                reportBlockedCookie(request, count);
+            }
+
+            delete state[tabId].requests[requestId];
+        },
+
+        handleError: (details) => {
+            const { tabId, requestId } = details;
+
+            if (!state.hasOwnProperty(tabId)
+                || !state[tabId].requests.hasOwnProperty(requestId)) {
+                return;
+            }
+
+            var request = state[tabId].requests[requestId];
+
+            // TODO refactor
+            if (request.cancelled) {
+                var count = incrementTabCount(tabId);
+                reportBlockedService(request, count);
+            }
+            else if(details.error) {
+                emitError({type: 'error', data: details.error});
+            }
+
+            delete state[tabId].requests[requestId];
         }
-    }
+    });
 
-
-    endRequest(details) {
-        const { tabId, requestId } = details;
-
-        if (!this.state.hasOwnProperty(tabId)
-            || !this.state[tabId].requests.hasOwnProperty(requestId)) {
-            return;
-        }
-
-        var request = this.state[tabId].requests[requestId];
-
-        if (request.blockedThirdPartyCookie) {
-            var count = this.incrementTabCount(tabId);
-            this.reportBlockedCookie(request, count);
-        }
-
-        delete this.state[tabId].requests[requestId];
-    }
-
-    incrementTabCount(tabId) {
-        this.state[tabId].totalCount += 1;
-        return this.state[tabId].totalCount;
-    }
-
-    handleError(details) {
-        const { tabId, requestId } = details;
-
-        if (!this.state.hasOwnProperty(tabId)
-            || !this.state[tabId].requests.hasOwnProperty(requestId)) {
-            return;
-        }
-
-        var request = this.state[tabId].requests[requestId];
-
-        // TODO refactor
-        if (request.cancelled) {
-            var count = this.incrementTabCount(tabId);
-            this.reportBlockedService(request, count);
-        }
-        else if(details.error) {
-            this.emitError({type: 'error', data: details.error});
-        }
-
-        delete this.state[tabId].requests[requestId];
-    }
 
     // Private functions
+    function incrementTabCount(tabId) {
+        state[tabId].totalCount += 1;
+        return state[tabId].totalCount;
+    }
 
-    configureRequest(details) {
+    function configureRequest(details) {
         const { tabId, requestId } = details;
 
-        if (!this.state.hasOwnProperty(tabId)) {
+        if (!state.hasOwnProperty(tabId)) {
             return;
         }
 
         var requestDomain = getDomain(details.url);
 
         if (!details.initiator || details.initiator === 'null') {
-            this.state[tabId].pageDomain = requestDomain;
+            state[tabId].pageDomain = requestDomain;
             //console.warn('switched pageDomain to ' + requestedDomain + ' because initator is empty or "null"', details.initator);
         }
 
@@ -207,14 +203,14 @@ class RequestManager {
             cancelled: false
         };
         // request domain === page domain
-        request.isFirstPartyRequest = isFirstPartyRequest(requestDomain, this.state[tabId].pageDomain);
+        request.isFirstPartyRequest = isFirstPartyRequest(requestDomain, state[tabId].pageDomain);
 
         // requesting a known tracking service or undefined
-        request.service = lookup(this.services, requestDomain);
+        request.service = lookup(services, requestDomain);
 
         // true when this is a service and it is allowed within the domain matching rules
         request.isAllowedServiceRequest = request.service ?
-            this.isAllowedServiceRequest(request.service, this.state[tabId].pageDomain) : false;
+            isAllowedServiceRequest(request.service, state[tabId].pageDomain) : false;
 
         if (request.service && !request.isAllowedServiceRequest) {
             request.cancelled = true;
@@ -223,62 +219,70 @@ class RequestManager {
         return request;
     }
 
-    reportBlockedService(request, count) {
-        var service = this.services[request.service],
-            data = Object.assign(
-                BlockedEventData(
+    /** report blocking of a tracking service. **/
+    function reportBlockedService(request, count) {
+        var service = services[request.service],
+            data = BlockedEventData(
                     request, count, service.category
-                ),
-                {
-                    name: service.name,
-                    url: service.url,
-                });
+                );
 
-        this.emitEvent(data);
+        emitEvent(
+            Object.assign(data, {
+                name: service.name,
+                url: service.url,
+            })
+        );
 
     }
 
-    reportBlockedCookie(request, count) {
+    /** report blocking of a third-party cookie. **/
+    function reportBlockedCookie(request, count) {
         var data = BlockedEventData(
             request, count, 'Cookie');
 
-        this.emitEvent(data);
+        emitEvent(data);
     }
 
-    emitEvent(obj) {
-        if(!this.eventSink) {
+    function emitEvent(obj) {
+        if(!eventSink) {
             console.error('event sink not registered');
         }
-        else this.eventSink.add(
-            {
-                type: EventType,
-                data: obj
-            }
-        );
+        else {
+            eventSink.add(
+                {
+                    type: EventType,
+                    data: obj
+                }
+            );
+        }
     }
 
-    emitError(obj) {
-        if(!this.errorSink) {
+    function emitError(obj) {
+        if(!errorSink) {
             console.error('event sink not registered');
         }
-        else this.errorSink.add(obj);
+        else {
+            errorSink.add(obj);
+        }
     }
 
-    isAllowedServiceRequest(service, pageDomain) {
-        if (!service || !this.services.hasOwnProperty(service)) {
+    function isAllowedServiceRequest(service, pageDomain) {
+        if (!service || !services.hasOwnProperty(service)) {
             return false;
         }
         // is this a request calling back to an allowed url of a first-party service provider?
-        var serviceDefinition = this.services[service];
+        var serviceDefinition = services[service];
         // find out whether serviceDomain of request and pageDomain each map to the same service
-        var firstPartyService = lookup(this.services, pageDomain);
+        var firstPartyService = lookup(services, pageDomain);
 
         if(!firstPartyService) {
             return false;
         }
 
-        return areEqual(serviceDefinition, this.services[firstPartyService]);
+        return areEqual(serviceDefinition, services[firstPartyService]);
     }
+
+    return requestManager;
 }
 
 

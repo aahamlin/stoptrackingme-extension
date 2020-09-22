@@ -59,5 +59,12 @@ function Sink(addEvent) {
     });
 }
 
+const defaultEvents = StreamController();
+const defaultErrors = StreamController();
+
+export const eventSink = defaultEvents.sink;
+export const eventStream = defaultEvents.stream;
+export const errorSink = defaultErrors.sink;
+export const errorStream = defaultErrors.stream;
 
 export { StreamController as default };

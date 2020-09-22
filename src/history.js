@@ -2,6 +2,24 @@ import { EventType } from './requestHandler.js';
 import CACHE from './cache.js';
 import { saveHistory } from './storage.js';
 
+// goal of this refactor is to save history differently allowing the UI to display in local timezone
+// timezones can be wicked, hour and half-hour must be accounted for. Therefore, we can save the
+// history in 1 minute intervals, allowing the UI (elm) to reduce the entries to accurate timezones.
+// rather than a history per day holding counts of categories, e.g.'date': [1,2,1,2,1,2,1]
+// let's cache category:[millis,millis,...]
+// then a task will run on a 1 sec interval and update the history object
+// with all new category counts to the respective minute.
+// this new routine should not require loading the history here.
+/*loadHistory().then((today) => {
+    console.log('history loaded for today', JSON.stringify(today));
+}).catch((err) => {
+    console.log('loading history failed', err);
+}).finally(() => {
+    //browser.tabs.onUpdated.addListener(saveHistory);
+});*/
+
+
+
 export const MILLIS_PER_DAY = 86400000;
 
 // history includes objects { name: "category", count: int }

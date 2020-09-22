@@ -29,5 +29,4 @@ function showTotal(count, tabId) {
         .setBadgeText(data);
 };
 
-
 export { handleBlockingEvent as default };

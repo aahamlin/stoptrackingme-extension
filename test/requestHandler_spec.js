@@ -1,25 +1,7 @@
 import testData from './helpers/testData.js';
 import * as testUtils from './helpers/testUtils.js';
 import { configureServices } from '../src/services.js';
-//import state from '../src/state_provider.js';
 import { createRequestManager } from '../src/requestHandler.js';
-
-describe('class RequestManager', function() {
-
-    it('#ctor populates empty objects', function () {
-        var rm = createRequestManager();
-        expect(rm.services).to.be.empty;
-        expect(rm.state).to.be.empty;
-    });
-
-    it('#ctor uses supplied objects', function() {
-        var services = { 'foo': 1 },
-            state = { 'bar': 1 }
-        var rm = createRequestManager(services, state);
-        expect(rm.services).to.equal(services);
-        expect(rm.state).to.equal(state);
-    });
-});
 
 describe('requestHandler', function() {
 
@@ -79,10 +61,11 @@ describe('requestHandler', function() {
         });
 
         requestManager = createRequestManager(
-            services, state);
-        requestManager.registerEventSinks(
-            { add: eventSpy }, { add: errorSpy });
-
+            services, {
+                'state': state,
+                'events': { add: eventSpy },
+                'errors': { add: errorSpy }
+            });
 
     });
 
