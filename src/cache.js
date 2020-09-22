@@ -1,10 +1,6 @@
+export function SimpleCache() {
 
-
-const CACHE = SimpleCache();
-
-function SimpleCache() {
-
-    var _cache = {};
+    var _cache = arguments.length === 1 ? arguments[0] : {};
 
     return {
         get: (k) => {
@@ -30,5 +26,7 @@ function SimpleCache() {
         }
     };
 }
+
+const CACHE = SimpleCache();
 
 export { CACHE as default };
