@@ -1,23 +1,8 @@
 import { EventType } from './requestHandler.js';
+import CACHE from './cache.js';
 import { saveHistory } from './storage.js';
 
 export const MILLIS_PER_DAY = 86400000;
-
-const _cache = {};
-
-export function setCache(key, value) {
-    _cache[key] = value;
-}
-
-export function getCache(key) {
-    if (key in _cache) {
-        return _cache[key];
-    }
-}
-
-export function deleteCache(key) {
-    delete _cache[key];
-}
 
 // history includes objects { name: "category", count: int }
 // events include:
@@ -36,14 +21,14 @@ export function handleBlockingEvent(event) {
     }
 
     var dateKey = asDateKey(data.blockedTime),
-        today = getCache(dateKey) || [0,0,0,0,0,0,0,0];
+        today = CACHE.get(dateKey) || [0,0,0,0,0,0,0,0];
 
     today = incrementCount(today, data.category);
 
-    setCache(dateKey, today);
+    CACHE.set(dateKey, today);
 
     // todo save history every second until page settles
-    saveHistory(_cache);
+    saveHistory(CACHE.toObject());
 };
 
 function incrementCount(today, categoryName) {
@@ -76,6 +61,7 @@ function getIndex(categoryName) {
     }
 }
 
+// TODO remove after refactoring
 /**
  * @param epoch timeStamp
  * @return epoch equal to that date, e.g. June 19, 2020

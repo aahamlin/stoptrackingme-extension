@@ -1,6 +1,7 @@
 import browser from '../src/browser.js';
 import { EventType } from '../src/requestHandler.js';
-import { asDateKey, handleBlockingEvent, deleteCache } from '../src/history.js';
+import { asDateKey, handleBlockingEvent } from '../src/history.js';
+import CACHE from '../src/cache.js';
 
 describe('history', function () {
 
@@ -38,7 +39,7 @@ describe('history', function () {
         });
 
         afterEach(function () {
-            deleteCache(dateKey);
+            CACHE.delete(dateKey);
             delete browser.storage.local.set;
             sinon.restore();
         });
