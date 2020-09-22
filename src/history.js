@@ -1,33 +1,22 @@
-import browser from './browser.js';
 import { EventType } from './requestHandler.js';
-//import { history } from './state_provider.js';
+import { saveHistory } from './storage.js';
 
 export const MILLIS_PER_DAY = 86400000;
 
-export const history = {};
+const _cache = {};
 
-// TODO phase 2: history is changing from a summary of a day individual events.
-export function loadHistory() {
-    var dateKey = asDateKey(Date.now());
-    return new Promise((resolve, reject) => {
-        browser.storage.local.get(dateKey, function (result) {
-            if (browser.runtime.lastError) {
-                console.warn(browser.runtime.lastError.message);
-            }
-            //console.log('found ' + dateKey + ' = ' + JSON.stringify(result[dateKey]));
-            history[dateKey] = result[dateKey];
-            resolve(history);
-        });
-    });
+export function setCache(key, value) {
+    _cache[key] = value;
 }
 
-export function saveHistory(history) {
-    browser.storage.local.set(history, function () {
-        if(browser.runtime.lastError) {
-            console.warn(browser.runtime.lastError.message);
-        }
-        //console.log('saved history ' + JSON.stringify(history));
-    });
+export function getCache(key) {
+    if (key in _cache) {
+        return _cache[key];
+    }
+}
+
+export function deleteCache(key) {
+    delete _cache[key];
 }
 
 // history includes objects { name: "category", count: int }
@@ -47,15 +36,14 @@ export function handleBlockingEvent(event) {
     }
 
     var dateKey = asDateKey(data.blockedTime),
-        today = history[dateKey] || [0,0,0,0,0,0,0,0];
+        today = getCache(dateKey) || [0,0,0,0,0,0,0,0];
 
     today = incrementCount(today, data.category);
 
-    history[dateKey] = today;
+    setCache(dateKey, today);
 
-    // save history every second until page settles
-    
-    saveHistory(history);
+    // todo save history every second until page settles
+    saveHistory(_cache);
 };
 
 function incrementCount(today, categoryName) {

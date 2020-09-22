@@ -1,15 +1,8 @@
-import * as testUtils from './helpers/testUtils.js';
 import browser from '../src/browser.js';
 import { EventType } from '../src/requestHandler.js';
-//import { history } from '../src/state_provider.js';
-import { asDateKey,
-         loadHistory, saveHistory,
-         handleBlockingEvent, history
-       } from '../src/history.js';
-
+import { asDateKey, handleBlockingEvent, deleteCache } from '../src/history.js';
 
 describe('history', function () {
-
 
     it('#asDateKey returns epoch timestamp string from start of day', function () {
         var utcJun19 = new Date(Date.UTC(2020, 5, 19, 0, 0, 0, 1));
@@ -26,44 +19,16 @@ describe('history', function () {
 
     });
 
-    describe('#retrieval tests', function() {
+    describe('#handleBlockingEvent', function () {
+
+        var setFake = sinon.fake(),
+            timeStamp, dateKey, testarray;
 
         beforeEach(function () {
-            Object.assign(browser.storage, {
-                local: {
-                    get: () => {}
-                }
-            });
-        });
 
-        // TODO https://www.chaijs.com/plugins/chai-as-promised/
-        it('#loadHistory() returns promise of history', function (done) {
-            var dateKey = asDateKey(Date.now()),
-                historyToday = {};
-
-            historyToday[dateKey] = [5,0,0,0,0,0,0,0];
-            browser.storage.local.get = function(_, cb) {
-                cb(historyToday);
-            };
-
-            loadHistory().then(
-                function (result) {
-                    expect(result).to.deep.equal(historyToday);
-                    done();
-                })
-                .catch(function(err) {
-                    done(err);
-                });
-        });
-
-    });
-
-    describe('#storage tests', function () {
-
-        var setFake = sinon.fake();
-
-        beforeEach(function () {
-            testUtils.clearAllProps(history);
+            timeStamp = Date.now();
+            dateKey = asDateKey(timeStamp);
+            testarray = [0,0,0,0,0,0,0,0];
 
             Object.assign(browser.storage, {
                 local: {
@@ -73,13 +38,9 @@ describe('history', function () {
         });
 
         afterEach(function () {
+            deleteCache(dateKey);
+            delete browser.storage.local.set;
             sinon.restore();
-        });
-
-
-        it('#saveHistory() calls storage.set', function () {
-            saveHistory({});
-            expect(setFake.calledOnce).to.be.true;
         });
 
         var categoryTests = [
@@ -95,12 +56,8 @@ describe('history', function () {
         ];
 
         categoryTests.forEach((test) => {
-            it('#handleBlockingEvent() increments ' + test.cat + ' category',
+            it('#increment ' + test.cat + ' category',
                function() {
-
-                   var timeStamp = Date.now(),
-                       dateKey = asDateKey(timeStamp),
-                       testarray = [0,0,0,0,0,0,0,0];
 
                    testarray[test.index] += 1;
                    handleBlockingEvent({
@@ -117,7 +74,6 @@ describe('history', function () {
                        .and.to.include.ordered.members(testarray);
                });
         });
+
     });
-
-
 });
