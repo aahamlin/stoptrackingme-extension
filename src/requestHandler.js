@@ -19,7 +19,7 @@ export function createRequestManager(svc, cfg) {
     const eventSink = (cfg && cfg['events']) ? cfg['events'] : defaultEventSink;
     const errorSink = (cfg && cfg['errors']) ? cfg['errors'] : defaultErrorSink;
 
-    const requestManager = Object.create({
+    const requestManagerPrototype = {
         addTab: (info) => {
             const { tabId } = info;
             if(!state.hasOwnProperty(tabId)) {
@@ -172,7 +172,7 @@ export function createRequestManager(svc, cfg) {
 
             delete state[tabId].requests[requestId];
         }
-    });
+    };
 
 
     // Private functions
@@ -282,7 +282,7 @@ export function createRequestManager(svc, cfg) {
         return areEqual(serviceDefinition, services[firstPartyService]);
     }
 
-    return requestManager;
+    return Object.create(requestManagerPrototype);
 }
 
 

@@ -1,6 +1,5 @@
 import browser from '../src/browser.js';
 import { EventType } from '../src/requestHandler.js';
-import { loadHistory } from '../src/storage.js';
 import { asDateKey, initHistory, handleBlockingEvent } from '../src/history.js';
 import CACHE from '../src/cache.js';
 

@@ -1,16 +1,14 @@
 import StreamController from '../src/streams.js';
 
-describe('events', function () {
+describe('StreamController', function () {
     var streamController;
 
     const evtObj = {
         tabId: 1,
-        requestId: 2,
-        tracker: {
-            category: 'Analytics',
-            url: 'http://www.63squares.com',
-            name: '63 Squares'
-        }
+        requestDomain: '63squares.com',
+        blockedTime: Date.now(),
+        category: 'Analytics',
+        totalCount: 2
     };
 
     beforeEach(function() {

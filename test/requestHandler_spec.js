@@ -47,8 +47,6 @@ describe('requestHandler', function() {
 
         state = {};
         services = configureServices(testData);
-
-        // todo use spies
         eventSpy = sinon.spy();
         errorSpy = sinon.spy();
 
@@ -70,8 +68,6 @@ describe('requestHandler', function() {
     });
 
     afterEach(function() {
-        //testUtils.clearAllProps(state);
-        //resetTrackingServices();
         // some tests have to change these values, make sure use a copy
         expect(detailsOfNonTracker.initiator).to.be.equal('https://www.initiator.com/');
         expect(detailsOfTracker.initiator).to.be.equal('https://www.initiator.com/');

@@ -1,25 +1,30 @@
 import browser from '../src/browser.js';
 
-import { loadHistory, saveHistory } from '../src/storage.js';
+import * as Storage from '../src/storage.js';
 
-describe('#retrieval tests', function() {
+describe('Storage', function() {
+
+    var setFake = sinon.fake();
 
     beforeEach(function () {
         Object.assign(browser.storage, {
             local: {
-                get: () => {}
+                get: () => {},
+                set: setFake
             }
         });
     });
 
     afterEach(function() {
         delete browser.storage.local.get;
+        delete browser.storage.local.set;
+        sinon.restore();
     });
 
     // TODO https://www.chaijs.com/plugins/chai-as-promised/
 
     // Change the history argument to an immutable string "__CACHE__" or something...
-    it('#loadHistory() returns promise of history', function (done) {
+    it('#load() returns promise with history', function (done) {
         var dateKey = '1600646400000', // asDateKey(Date.now()),
             historyToday = {};
 
@@ -29,7 +34,7 @@ describe('#retrieval tests', function() {
         };
 
         // TODO this is not testing that call args to storage.local.get.
-        loadHistory().then(
+        Storage.load().then(
             function (result) {
                 expect(result).to.deep.equal(historyToday);
                 done();
@@ -39,31 +44,8 @@ describe('#retrieval tests', function() {
             });
     });
 
-});
-
-
-describe('#storage tests', function () {
-
-    var setFake = sinon.fake();
-
-    beforeEach(function () {
-        //testUtils.clearAllProps(history);
-
-        Object.assign(browser.storage, {
-            local: {
-                set: setFake
-            }
-        });
-    });
-
-    afterEach(function () {
-        delete browser.storage.local.set;
-        sinon.restore();
-    });
-
-
-    it('#saveHistory() calls storage.set', function () {
-        saveHistory({});
+    it('#save() calls storage.set', function () {
+        Storage.save({});
         expect(setFake.calledOnce).to.be.true;
     });
 });

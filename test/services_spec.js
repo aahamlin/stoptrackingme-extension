@@ -1,5 +1,4 @@
 import testData from './helpers/testData.js';
-//import * as testUtils from './helpers/testUtils.js';
 import browser from '../src/browser.js';
 import {
     lookup,

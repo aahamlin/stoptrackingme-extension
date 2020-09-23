@@ -9,6 +9,7 @@ export function handleBlockingEvent(event) {
     if (type !== EventType) {
         return;
     }
+    
     showTotal(data.totalCount, data.tabId);
 };
 

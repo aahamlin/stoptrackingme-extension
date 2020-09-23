@@ -1,7 +1,8 @@
 import browser from './browser.js';
 
-// TODO phase 2: history is changing from a summary of a day individual events.
-export function loadHistory() {
+// TODO storage is changing from a summary of a day to individual events.
+// consider storing the "cache" as a single keyed item in localstorage.
+export function load() {
     return new Promise((resolve, _) => {
         browser.storage.local.get(null, function (result) {
             if (browser.runtime.lastError) {
@@ -14,7 +15,7 @@ export function loadHistory() {
     });
 }
 
-export function saveHistory(history) {
+export function save(history) {
     browser.storage.local.set(history, function () {
         if(browser.runtime.lastError) {
             console.warn(browser.runtime.lastError.message);
