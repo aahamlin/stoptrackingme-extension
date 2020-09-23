@@ -11,6 +11,18 @@ export function StreamController() {
         if (_isClosed) throw new Error('stream is already closed');
         if (!event) throw new Error('No event provided');
         events.push(event);
+        sendToStreams();
+    };
+
+    function addListener(listener) {
+        if (_isClosed) throw new Error('stream is already closed');
+        if (typeof listener !== 'function') throw new Error('Function required');
+        if (listener.length === 0) throw new Error('Listener fails specification');
+        listeners.push(listener);
+        sendToStreams();
+    };
+
+    function sendToStreams() {
         setTimeout(function() {
             var nextEvent;
             if (listeners.length < 1) return;
@@ -20,14 +32,7 @@ export function StreamController() {
                 }
             }
         }, 0);
-    };
-
-    function addListener(listener) {
-        if (_isClosed) throw new Error('stream is already closed');
-        if (typeof listener !== 'function') throw new Error('Function required');
-        if (listener.length === 0) throw new Error('Listener fails specification');
-        listeners.push(listener);
-    };
+    }
 
     return Object.create({
         stream: Stream(addListener),

@@ -72,8 +72,8 @@ describe('StreamController', function () {
             };
 
         sink.add({type:'blockedCookie', data: evtObj});
-        stream.listen(listenerFn);
         sink.add({ type: 'blockedCookie', data: evtObj});
+        stream.listen(listenerFn);
     });
 
 });
