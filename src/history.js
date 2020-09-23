@@ -29,10 +29,28 @@ export function handleBlockingEvent(event) {
     today = incrementCount(today, data.category);
 
     CACHE.set(dateKey, today);
-
-    // TODO save history every second until page settles
-    Storage.save(CACHE.toObject());
 };
+
+export function startTimer(timeout) {
+    const timer = setInterval(
+        saveCacheToDisk,
+        timeout);
+    return timer;
+}
+
+export function stopTimer(timerFn) {
+    clearInterval(timerFn);
+}
+
+var lastUpdateTime = 0;
+
+function saveCacheToDisk() {
+    var latestUpdateTime = CACHE.lastUpdate();
+    if (latestUpdateTime > lastUpdateTime) {
+        Storage.save(CACHE.toObject());
+        lastUpdateTime = latestUpdateTime;
+    }
+}
 
 function incrementCount(today, categoryName) {
     today[getIndex(categoryName)] += 1;

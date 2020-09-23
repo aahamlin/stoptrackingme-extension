@@ -5,7 +5,7 @@ import requestManager from './requestHandler.js';
 import { eventStream, errorStream } from './streams.js';
 import { handleBlockingEvent } from './ui.js';
 import {
-    initHistory,
+    initHistory, startTimer,
     handleBlockingEvent as handleHistoryEvent
 } from './history.js';
 
@@ -13,7 +13,7 @@ const netFilters = {
     urls: ['https://*/*', 'http://*/*'],
 };
 
-initHistory();
+initHistory().then(startTimer(1500));
 
 initTrackingServices().then(registerExtensionListeners);
 
@@ -24,10 +24,7 @@ function registerExtensionListeners(trackingServices) {
     // start listening for events
     eventStream.listen(handleBlockingEvent);
     eventStream.listen(handleHistoryEvent);
-    errorStream.listen(function(err) {
-        const { data } = err;
-        console.log('Error occurred:' + data);
-    });
+    errorStream.listen(handleError);
 
     browser.tabs.query({}, function(tabs) {
         var tabId;
@@ -92,4 +89,9 @@ function registerExtensionListeners(trackingServices) {
         netFilters
     );
 
+}
+
+function handleError(err) {
+    const { data } = err;
+    console.log('Error occurred:' + data);
 }

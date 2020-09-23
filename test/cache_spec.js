@@ -16,8 +16,10 @@ describe('Cache module', function() {
     });
 
     it('#set caches a value', function() {
+        var oldLastUpdate = cache.lastUpdate();
         cache.set('set-text', 'set-value');
         expect(cache.get('set-text')).to.be.equal('set-value');
+        expect(cache.lastUpdate() > oldLastUpdate).to.be.true;
     });
 
     it('#delete removes a value', function() {

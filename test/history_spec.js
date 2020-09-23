@@ -1,6 +1,11 @@
 import browser from '../src/browser.js';
 import { EventType } from '../src/requestHandler.js';
-import { asDateKey, initHistory, handleBlockingEvent } from '../src/history.js';
+import { asDateKey,
+         initHistory,
+         handleBlockingEvent,
+         startTimer,
+         stopTimer
+       } from '../src/history.js';
 import CACHE from '../src/cache.js';
 
 describe('history', function () {
@@ -21,9 +26,7 @@ describe('history', function () {
     });
 
     describe('#initHistory', function() {
-
-        beforeEach(function() {
-
+        before(function() {
             Object.assign(browser.storage, {
                 local: {
                     get: (_, cb) => {
@@ -34,16 +37,20 @@ describe('history', function () {
         });
 
         afterEach(function() {
-            delete browser.storage.local.get;
+            CACHE.delete('key1');
             sinon.restore();
         });
 
+        after(function() {
+            delete browser.storage.local.get;
+        });
+
         it('stores return value in cache', function(done) {
-            // TODO needs to return a Promise for testing...
             initHistory().then(
                 function(_) {
                     // TODO check CACHE for keys
                     expect(CACHE.keys()).to.have.members(['key1']);
+                    expect(CACHE.get('key1')).to.be.equal('value1');
                     done();
                 })
                 .catch(function(err) {
@@ -52,28 +59,63 @@ describe('history', function () {
         });
     });
 
+    describe('#saveCacheToDisk', function() {
+        var fake, clock, timer;
+
+        beforeEach(function() {
+            fake = sinon.fake();
+            Object.assign(browser.storage, {
+                local: {
+                    set: fake
+                }
+            });
+            clock = sinon.useFakeTimers({
+                now: Date.now(),
+                toFake: ['setInterval', 'clearInterval', 'Date']
+            });
+            timer = startTimer(5);
+        });
+
+        afterEach(function() {
+            clearInterval(timer);
+            CACHE.delete('key1');
+            CACHE.delete('key2');
+            delete browser.storage.local.set;
+            sinon.restore();
+            clock.restore();
+        });
+
+        it('#startTimer saves incremental updates', function() {
+            CACHE.set('key1', 'value1');
+            clock.tick(10);
+            sinon.assert.calledOnce(fake);
+
+            CACHE.set('key2', 'value2');
+            clock.tick(10);
+            sinon.assert.calledTwice(fake);
+        });
+
+        it('#stopTimer', function() {
+            stopTimer(timer);
+            clock.runAll();
+            CACHE.set('key1', 'value1');
+            sinon.assert.notCalled(fake);
+        });
+
+    });
+
     describe('#handleBlockingEvent', function () {
 
-        var setFake = sinon.fake(),
-            timeStamp, dateKey, testarray;
+        var timeStamp, dateKey, testarray;
 
         beforeEach(function () {
-
             timeStamp = Date.now();
             dateKey = asDateKey(timeStamp);
             testarray = [0,0,0,0,0,0,0,0];
-
-            Object.assign(browser.storage, {
-                local: {
-                    set: setFake
-                }
-            });
         });
 
         afterEach(function () {
             CACHE.delete(dateKey);
-            delete browser.storage.local.set;
-            sinon.restore();
         });
 
         var categoryTests = [
@@ -99,10 +141,8 @@ describe('history', function () {
                                blockedTime: timeStamp
                              }
                    });
-
-                   var result = setFake.firstArg;
-                   expect(result).to.have.property(dateKey);
-                   expect(result[dateKey]).to.be.an('array')
+                   expect(CACHE.keys()).to.have.members([dateKey]);
+                   expect(CACHE.get(dateKey)).to.be.an('array')
                        .and.have.length(8)
                        .and.to.include.ordered.members(testarray);
                });
