@@ -2,7 +2,7 @@
 import browser from './browser.js';
 import { initTrackingServices } from './services.js';
 import requestManager from './requestHandler.js';
-import { eventStream, errorStream } from './streams.js';
+import StreamController from './streams.js';
 import { handleBlockingEvent } from './ui.js';
 import {
     initHistory, startTimer,
@@ -13,18 +13,27 @@ const netFilters = {
     urls: ['https://*/*', 'http://*/*'],
 };
 
-initHistory().then(startTimer(1500));
+const storageTimeMs = 1500;
 
-initTrackingServices().then(registerExtensionListeners);
+initHistory()
+    .then(startTimer(storageTimeMs));
+
+initTrackingServices()
+    .then(registerExtensionListeners);
 
 function registerExtensionListeners(trackingServices) {
 
-    var rm = requestManager(trackingServices);
+    var eventStreamController = StreamController(),
+        errorsStreamController = StreamController(),
+        rm = requestManager(trackingServices, {
+            'events': eventStreamController.sink,
+            'errors': errorsStreamController.sink
+        });
 
     // start listening for events
-    eventStream.listen(handleBlockingEvent);
-    eventStream.listen(handleHistoryEvent);
-    errorStream.listen(handleError);
+    eventStreamController.stream.listen(handleBlockingEvent);
+    eventStreamController.stream.listen(handleHistoryEvent);
+    errorsStreamController.stream.listen(handleError);
 
     browser.tabs.query({}, function(tabs) {
         var tabId;

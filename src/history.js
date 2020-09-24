@@ -1,6 +1,8 @@
 import { EventType } from './requestHandler.js';
-import CACHE from './cache.js';
+import { SimpleCache } from './cache.js';
 import * as Storage from './storage.js';
+
+export const CACHE = SimpleCache();
 
 export function initHistory() {
     return new Promise((resolve, _) => {

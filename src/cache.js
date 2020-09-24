@@ -37,7 +37,3 @@ export function SimpleCache() {
         }
     };
 }
-
-const CACHE = SimpleCache();
-
-export { CACHE as default };

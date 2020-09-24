@@ -4,9 +4,9 @@ import { asDateKey,
          initHistory,
          handleBlockingEvent,
          startTimer,
-         stopTimer
+         stopTimer,
+         CACHE
        } from '../src/history.js';
-import CACHE from '../src/cache.js';
 
 describe('history', function () {
 

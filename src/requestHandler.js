@@ -1,9 +1,4 @@
 import { lookup, areEqual } from './services.js';
-import {
-    eventSink as defaultEventSink,
-    errorSink as defaultErrorSink
-} from './streams.js';
-
 
 // options
 const opts_allowThirdPartyCookies = false;
@@ -16,8 +11,8 @@ export function createRequestManager(svc, cfg) {
 
     const services = svc;
     const state = (cfg && cfg['state']) ? cfg['state'] : {};
-    const eventSink = (cfg && cfg['events']) ? cfg['events'] : defaultEventSink;
-    const errorSink = (cfg && cfg['errors']) ? cfg['errors'] : defaultErrorSink;
+    const eventSink = (cfg && cfg['events']) ? cfg['events'] : undefined;
+    const errorSink = (cfg && cfg['errors']) ? cfg['errors'] : undefined;
 
     const requestManagerPrototype = {
         addTab: (info) => {
