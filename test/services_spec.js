@@ -24,7 +24,7 @@ describe('services', function () {
         xhr.restore();
     });
 
-    it('#initTrackingServices() calls configureServices', function () {
+    it('should configure services from resource file', function () {
         var spy = sinon.spy(configureServices);
         initTrackingServices();
         requests[0].respond(200, { "Content-Type": "application/json" },
@@ -34,7 +34,7 @@ describe('services', function () {
 
     });
 
-    it('#configureServices() populates services', function () {
+    it('should populate services from parsed data', function () {
         var services = configureServices(testData);
         expect(services).to.have.property('2leep.com').and.to.be.an('object');
         expect(services).to.not.have.property('nothing-to-see.com');
@@ -42,7 +42,7 @@ describe('services', function () {
             {category: 'Social', name: 'AddThis', url: 'http://www.addthis.com/'});
     });
 
-    it('#lookup() returns serviceId', function () {
+    it('should lookup a valid serviceId', function () {
         var services = configureServices(testData);
         // key: 2leep.com
         expect(lookup(services, '2leep.com')).to.be.equal('2leep.com');
@@ -54,7 +54,7 @@ describe('services', function () {
         expect(lookup(services, '.com'))
     });
 
-    it('#lookup() checks valid args', function () {
+    it('should validate lookup args', function () {
         var services = configureServices(testData);
         expect(() => lookup()).to.throw(/provide services/);
         expect(() => lookup(services)).to.throw(/provide servername/);

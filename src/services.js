@@ -26,13 +26,6 @@ export function lookup(services, servername) {
 
 }
 
-export function areEqual(service1, service2) {
-    return (service1.name === service2.name
-            && service1.url === service2.url
-            && service1.category === service2.category);
-}
-
-
 /**
  * @return Promise resolves to @object containing tracking service definitions
  */

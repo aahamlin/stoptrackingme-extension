@@ -18,17 +18,17 @@ describe('ui', function () {
         sinon.restore();
     });
 
-    it('#handleBlockingEvent updates badge text', function () {
+    it('should update badge text', function () {
         handleBlockingEvent({ type: EventType, data: { tabId: 1, totalCount: 2 }});
         sinon.assert.calledWith(spySetBadgeText, sinon.match.has("text", "2"));
     });
 
-    it('#handleBlockingEvent updates badge color', function () {
+    it('should update badge color', function () {
         handleBlockingEvent({ type: EventType, data: { tabId: 1, totalCount: 2 }});
         sinon.assert.calledWith(spySetBgColor, sinon.match.has("color", sinon.match.string));
     });
 
-    it('#handleBlockingEvent ignores other events', function () {
+    it('should ignore other event types', function () {
         handleBlockingEvent({ type: 'foo', data: 1 });
         sinon.assert.notCalled(spySetBadgeText);
         sinon.assert.notCalled(spySetBgColor);

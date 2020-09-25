@@ -1,11 +1,11 @@
 import testData from './helpers/testData.js';
 import * as testUtils from './helpers/testUtils.js';
 import { configureServices } from '../src/services.js';
-import { createRequestManager } from '../src/requestHandler.js';
+import { createRequestHandler } from '../src/requestHandler.js';
 
 describe('requestHandler', function() {
 
-    var requestManager, services, state, eventSpy, errorSpy;
+    var requestHandler, services, state, eventSpy, errorSpy;
 
     const detailsOfTracker = {
         tabId: 1,
@@ -58,7 +58,7 @@ describe('requestHandler', function() {
             }
         });
 
-        requestManager = createRequestManager(
+        requestHandler = createRequestHandler(
             services, {
                 'state': state,
                 'events': { add: eventSpy },
@@ -73,24 +73,24 @@ describe('requestHandler', function() {
         expect(detailsOfTracker.initiator).to.be.equal('https://www.initiator.com/');
     });
 
-    it('#addTab creates state[tabId]', function() {
-        requestManager.addTab({ tabId: 2 });
+    it('should record tab by id', function() {
+        requestHandler.addTab({ tabId: 2 });
         expect(state).to.have.property('2');
     });
 
-    it('#updateTab sets state#pageDomain', function() {
+    it('should record domain of tab url', function() {
         //'https://www.initiator.com/'
         var tabInfo = { url: 'https://www.changedurl.com' };
-        requestManager.updateTab(1, tabInfo, tabInfo);
+        requestHandler.updateTab(1, tabInfo, tabInfo);
         expect(state[1]).to.have.property('pageDomain', 'www.changedurl.com');
     });
 
-    it('#removeTab removes state[tabId]', function() {
-        requestManager.removeTab(1);
+    it('should remove state of tab by id', function() {
+        requestHandler.removeTab(1);
         expect(state.hasOwnProperty(1)).to.be.false;
     });
 
-    it('#replaceTab() stores state under new id', function() {
+    it('should move state of tab to new id', function() {
         testUtils.updateState(state, {
             1: {
                 requests: {
@@ -100,74 +100,76 @@ describe('requestHandler', function() {
                 }
             }
         });
-        requestManager.replaceTab(2, 1);
+        requestHandler.replaceTab(2, 1);
         expect(state[2]).to.have.property('requests');
         expect(state[2].requests).to.include.property(
             detailsOfTracker.requestId);
         expect(state).to.not.have.property('1');
     });
 
-    it('#beginRequest() updates state#pageDomain', function() {
+    it('should updates domain of tab url when request begins', function() {
         var details = testUtils.merge({}, detailsOfNonTracker);
         details.initiator = undefined;
-        requestManager.beginRequest(details);
+        requestHandler.beginRequest(details);
         expect(state[detailsOfTracker.tabId]).to.have.property('pageDomain', 'www.safeurl.com');
     });
 
 
-    it('#beginRequest() stores requestId in state', function() {
-        requestManager.beginRequest(detailsOfNonTracker);
+    it('should record requestId when request begins', function() {
+        requestHandler.beginRequest(detailsOfNonTracker);
         expect(state[detailsOfNonTracker.tabId].requests).to.have.property(detailsOfNonTracker.requestId);
     });
 
-    it('#beginRequest() cancels third-party tracking service request', function() {
-        var ret = requestManager.beginRequest(detailsOfTracker);
+    it('should cancel third-party tracking request', function() {
+        var ret = requestHandler.beginRequest(detailsOfTracker);
         expect(ret).to.have.property('cancel', true);
     });
 
-    it('#beginRequest() does not cancel first-party service request https://63squares.com', function() {
+    it('should not cancel first-party service request', function() {
         var details = testUtils.merge({}, detailsOfTracker);
-        details.initiator = undefined; //'http://63squares.com';
-        var ret = requestManager.beginRequest(details);
+        // browser requests with initiator of undefined or 'null' are first-party
+        details.initiator = undefined;
+        var ret = requestHandler.beginRequest(details);
         expect(ret).to.be.undefined;
     });
 
-    it('#beginRequest() does not cancel first-party service request to https://www.clearspring.com', function() {
+    it('#should not cancel first-party service request', function() {
         var details = testUtils.merge({}, detailsOfTracker);
+        // browsers requests with initiator of undefined or 'null' are first-party
         details.initiator = 'null'; // sets first party to clearspring.com
         details.url = 'https://www.clearspring.com';
-        var ret = requestManager.beginRequest(details);
+        var ret = requestHandler.beginRequest(details);
         expect(ret).to.be.undefined;
     });
 
-    it('#beginRequest() does not cancel third-party service request from first-party service', function() {
+    it('should not cancel third-party service request from first-party service', function() {
         testUtils.updateState(state,{
             1: { pageDomain: 'www.addthiscdn.com' }  // first-party of AddThis service
         });
         var details = testUtils.merge({}, detailsOfTracker);
         details.initiator = 'https://www.addthiscdn.com'; //first-party of AddThis service
         details.url = 'https://www.clearspring.com'; // third-party of AddThis service
-        var ret = requestManager.beginRequest(details);
+        var ret = requestHandler.beginRequest(details);
         expect(ret).to.be.undefined;
     });
 
 
-    it('#beginRequest() does not cancel non-tracking request', function() {
-        var ret = requestManager.beginRequest(detailsOfNonTracker);
+    it('should not cancel non-tracking request', function() {
+        var ret = requestHandler.beginRequest(detailsOfNonTracker);
         expect(ret).to.be.undefined;
     });
 
-    it('#handleSendHeaders() does not remove first-party cookies', function () {
+    it('should not remove first-party cookies', function () {
         var details = testUtils.merge({}, detailsOfNonTracker);
         details.initiator = undefined;
-        requestManager.beginRequest(details);
-        var res = requestManager.handleSendHeaders(details);
+        requestHandler.beginRequest(details);
+        var res = requestHandler.handleSendHeaders(details);
         expect(res).to.be.undefined;
     });
 
-    it('#handleSendHeaders() removes third-party cookies', function() {
-        requestManager.beginRequest(detailsOfNonTracker);
-        var res = requestManager.handleSendHeaders(detailsOfNonTracker);
+    it('should not removed third-party cookies', function() {
+        requestHandler.beginRequest(detailsOfNonTracker);
+        var res = requestHandler.handleSendHeaders(detailsOfNonTracker);
         expect(res).to.be.an('object');
         expect(res).to.have.property('requestHeaders');
         expect(res.requestHeaders).to.include.deep.members([detailsOfTracker.requestHeaders[0]])
@@ -175,37 +177,40 @@ describe('requestHandler', function() {
 
     });
 
-    it('#handleSendHeaders() does not remove cookies from first-party service request to http://63squares.com', function() {
+    it('should not remove cookies from first-party service request', function() {
         var details = testUtils.merge({}, detailsOfTracker);
-        details.initiator = undefined; //'http://63squares.com';
-        var ret = requestManager.beginRequest(details);
+        // browsers requests with initiator of undefined or 'null' are first-party
+        details.initiator = undefined;
+        var ret = requestHandler.beginRequest(details);
         expect(ret).to.be.undefined;
-        expect(requestManager.handleSendHeaders(details)).to.be.undefined;
+        expect(requestHandler.handleSendHeaders(details)).to.be.undefined;
     });
 
-    it('#handleSendHeaders() does not remove third-party cookies from first-party services', function() {
+    it('should not remove third-party cookies from first-party services', function() {
         testUtils.updateState(state,{
             1: { pageDomain: '63squares.com' }  // first-party of AddThis service
         });
         var details = testUtils.merge({}, detailsOfTracker);
+        // browsers requests with initiator of undefined or 'null' are first-party
         details.initiator = 'null';
         details.url = 'https://www.i-stats.com/service';
-        var ret = requestManager.beginRequest(details);
+        var ret = requestHandler.beginRequest(details);
         expect(ret).to.be.undefined;
-        expect(requestManager.handleSendHeaders(details)).to.be.undefined;
+        expect(requestHandler.handleSendHeaders(details)).to.be.undefined;
     });
 
-    it('#handleHeadersReceived() does not remove first-party cookies', function () {
+    it('should not remove first-party cookies', function () {
         var details = testUtils.merge({}, detailsOfNonTracker);
+        // browsers requests with initiator of undefined or 'null' are first-party
         details.initiator = undefined;
-        requestManager.beginRequest(details);
-        var res = requestManager.handleHeadersReceived(details);
+        requestHandler.beginRequest(details);
+        var res = requestHandler.handleHeadersReceived(details);
         expect(res).to.be.undefined;
     });
 
-    it('#handleHeadersReceived() removes third-party set-cookies', function() {
-        requestManager.beginRequest(detailsOfNonTracker);
-        var res = requestManager.handleHeadersReceived(detailsOfNonTracker);
+    it('should remove third-party set-cookies', function() {
+        requestHandler.beginRequest(detailsOfNonTracker);
+        var res = requestHandler.handleHeadersReceived(detailsOfNonTracker);
         expect(res).to.be.an('object');
         expect(res).to.have.property('responseHeaders');
         expect(res.responseHeaders).to.include.deep.members([
@@ -218,28 +223,30 @@ describe('requestHandler', function() {
 
     });
 
-    it('#handleHeadersReceived() does not remove set-cookies from first-party service request to http://63squares.com', function() {
+    it('should not remove set-cookies from first-party service', function() {
         var details = testUtils.merge({}, detailsOfTracker);
-        details.initiator = undefined; //'http://63squares.com';
-        var ret = requestManager.beginRequest(details);
+        // browsers requests with initiator of undefined or 'null' are first-party
+        details.initiator = undefined;
+        var ret = requestHandler.beginRequest(details);
         expect(ret).to.be.undefined;
-        expect(requestManager.handleHeadersReceived(details)).to.be.undefined;
+        expect(requestHandler.handleHeadersReceived(details)).to.be.undefined;
     });
 
-    it('#handleHeadersReceived() does not remove third-party set-cookies from first-party services', function() {
+    it('should remove third-party set-cookies from first-party services', function() {
         testUtils.updateState(state,{
             1: { pageDomain: '63squares.com' }  // first-party of AddThis service
         });
         var details = testUtils.merge({}, detailsOfTracker);
+        // browsers requests with initiator of undefined or 'null' are first-party
         details.initiator = 'null';
         details.url = 'https://www.i-stats.com/service';
-        var ret = requestManager.beginRequest(details);
+        var ret = requestHandler.beginRequest(details);
         expect(ret).to.be.undefined;
-        expect(requestManager.handleHeadersReceived(details)).to.be.undefined;
+        expect(requestHandler.handleHeadersReceived(details)).to.be.undefined;
     });
 
 
-    it('#endRequest() removes requestId from state', function() {
+    it('should remove requestId when request ends', function() {
         var reqState = {};
         reqState[detailsOfTracker.requestId] = {
             requestId: detailsOfTracker.requestId,
@@ -253,22 +260,22 @@ describe('requestHandler', function() {
         };
 
         testUtils.updateState(state, { 1: { requests: reqState } });
-        requestManager.endRequest(detailsOfTracker);
+        requestHandler.endRequest(detailsOfTracker);
         expect(state[detailsOfTracker.tabId].requests).to.not.have.property(detailsOfTracker.requestId);
         expect(state[detailsOfNonTracker.tabId].requests).to.have.property(detailsOfNonTracker.requestId);
     });
 
 
-    it('#endRequest emits blocked cookie event', function() {
+    it('should emit event of blocked third-party cookies', function() {
         var details = testUtils.merge({}, detailsOfNonTracker);
-        requestManager.beginRequest(details);
-        requestManager.handleSendHeaders(details);
-        requestManager.handleHeadersReceived(details);
-        requestManager.endRequest(details);
+        requestHandler.beginRequest(details);
+        requestHandler.handleSendHeaders(details);
+        requestHandler.handleHeadersReceived(details);
+        requestHandler.endRequest(details);
         expect(eventSpy.calledOnce).to.be.true;
     });
 
-    it('#handleError() removes requestId from state', function() {
+    it('should removes requestId when an error occurs', function() {
         var reqState = {};
         reqState[detailsOfTracker.requestId] = {
             requestId: detailsOfTracker.requestId,
@@ -282,21 +289,21 @@ describe('requestHandler', function() {
         };
 
         testUtils.updateState(state, { 1: { requests: reqState } });
-        requestManager.handleError(detailsOfTracker);
+        requestHandler.handleError(detailsOfTracker);
         expect(state[detailsOfTracker.tabId].requests).to.not.have.property(detailsOfTracker.requestId);
         expect(state[detailsOfNonTracker.tabId].requests).to.have.property(detailsOfNonTracker.requestId);
     });
 
-    it('#handleError emits blocked tracker event', function() {
+    it('should emit event of blocked tracker', function() {
         var details = testUtils.merge({}, detailsOfTracker);
-        requestManager.beginRequest(details);
-        requestManager.handleSendHeaders(details);
-        requestManager.handleHeadersReceived(details);
-        requestManager.handleError(details);
+        requestHandler.beginRequest(details);
+        requestHandler.handleSendHeaders(details);
+        requestHandler.handleHeadersReceived(details);
+        requestHandler.handleError(details);
         expect(eventSpy.calledOnce).to.be.true;
     });
 
-    it('#handleError emits error event', function() {
+    it('should emit error event when an error occurs', function() {
         var errorDetails = testUtils.merge({ error: 'test error' }, detailsOfTracker);
         var reqState = {};
 
@@ -307,7 +314,7 @@ describe('requestHandler', function() {
         };
 
         testUtils.updateState(state, { 1: { requests: reqState } });
-        requestManager.handleError(errorDetails);
+        requestHandler.handleError(errorDetails);
         expect(errorSpy.calledOnce).to.be.true;
     });
 

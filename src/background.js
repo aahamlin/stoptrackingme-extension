@@ -1,7 +1,7 @@
 /* setup the extension module */
 import browser from './browser.js';
 import { initTrackingServices } from './services.js';
-import requestManager from './requestHandler.js';
+import requestHandler from './requestHandler.js';
 import StreamController from './streams.js';
 import { handleBlockingEvent } from './ui.js';
 import {
@@ -25,11 +25,14 @@ function registerExtensionListeners(trackingServices) {
 
     var eventStreamController = StreamController(),
         errorsStreamController = StreamController(),
-        rm = requestManager(trackingServices, {
+        handler = requestHandler(trackingServices, {
             'events': eventStreamController.sink,
             'errors': errorsStreamController.sink
         });
 
+    // TODO this could all be pushed down into request handler and provide
+    // stream properties for events and errors.
+    
     // start listening for events
     eventStreamController.stream.listen(handleBlockingEvent);
     eventStreamController.stream.listen(handleHistoryEvent);
@@ -39,25 +42,25 @@ function registerExtensionListeners(trackingServices) {
         var tabId;
         for (let i = 0; i < tabs.length; i++) {
             tabId = tabs[i].id;
-            rm.addTab({ tabId: tabId });
-            rm.updateTab(tabId, { url: tabs[i].url }, tabs[i]);
+            handler.addTab({ tabId: tabId });
+            handler.updateTab(tabId, { url: tabs[i].url }, tabs[i]);
         }
     });
 
-    browser.tabs.onActivated.addListener(rm.addTab);
-    browser.tabs.onUpdated.addListener(rm.updateTab);
-    browser.tabs.onRemoved.addListener(rm.removeTab);
-    browser.tabs.onReplaced.addListener(rm.replaceTab);
+    browser.tabs.onActivated.addListener(handler.addTab);
+    browser.tabs.onUpdated.addListener(handler.updateTab);
+    browser.tabs.onRemoved.addListener(handler.removeTab);
+    browser.tabs.onReplaced.addListener(handler.replaceTab);
 
     browser.webRequest.onBeforeRequest.addListener(
-        rm.beginRequest,
+        handler.beginRequest,
         netFilters,
         ['blocking']
     );
 
     try {
         browser.webRequest.onBeforeSendHeaders.addListener(
-            rm.handleSendHeaders,
+            handler.handleSendHeaders,
             netFilters,
             ['blocking', 'requestHeaders', 'extraHeaders']
         );
@@ -65,7 +68,7 @@ function registerExtensionListeners(trackingServices) {
     catch (e) {
         // Firefox does not support extraHeaders, while chrome requires them
         browser.webRequest.onBeforeSendHeaders.addListener(
-            rm.handleSendHeaders,
+            handler.handleSendHeaders,
             netFilters,
             ['blocking', 'requestHeaders']
         );
@@ -73,7 +76,7 @@ function registerExtensionListeners(trackingServices) {
 
     try {
         browser.webRequest.onHeadersReceived.addListener(
-            rm.handleHeadersReceived,
+            handler.handleHeadersReceived,
             netFilters,
             ['blocking', 'responseHeaders', 'extraHeaders']
         );
@@ -81,7 +84,7 @@ function registerExtensionListeners(trackingServices) {
     catch (e) {
         // firefox does not support extraHeaders, while chrome requires them
         browser.webRequest.onHeadersReceived.addListener(
-            rm.handleHeadersReceived,
+            handler.handleHeadersReceived,
             netFilters,
             ['blocking', 'responseHeaders']
         );
@@ -89,12 +92,12 @@ function registerExtensionListeners(trackingServices) {
 
 
     browser.webRequest.onCompleted.addListener(
-        rm.endRequest,
+        handler.endRequest,
         netFilters
     );
 
     browser.webRequest.onErrorOccurred.addListener(
-        rm.handleError,
+        handler.handleError,
         netFilters
     );
 

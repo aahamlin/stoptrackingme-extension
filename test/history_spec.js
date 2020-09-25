@@ -10,14 +10,14 @@ import { asDateKey,
 
 describe('history', function () {
 
-    it('#asDateKey returns epoch timestamp string from start of day', function () {
+    it('#asDateKey() should return beginning of day epoch timestamp string from near start of day', function () {
         var utcJun19 = new Date(Date.UTC(2020, 5, 19, 0, 0, 0, 1));
         var jun19Key = '' + Date.UTC(2020, 5, 19, 0, 0, 0, 0);
         var  res = asDateKey(utcJun19.getTime());
         expect(res).to.be.an('string').and.equal(jun19Key);
     });
 
-    it('#asDateKey returns epoch timestamp string from end of day', function () {
+    it('#asDateKey() should return beginning of day epoch timestamp string from near end of day', function () {
         var utcJun18 = new Date(Date.UTC(2020, 5, 18, 23, 59, 59, 999));
         var jun18Key = '' + Date.UTC(2020, 5, 18, 0, 0, 0, 0);
         var res = asDateKey(utcJun18.getTime());
@@ -25,7 +25,7 @@ describe('history', function () {
 
     });
 
-    describe('#initHistory', function() {
+    describe('#initHistory()', function() {
         before(function() {
             Object.assign(browser.storage, {
                 local: {
@@ -45,7 +45,7 @@ describe('history', function () {
             delete browser.storage.local.get;
         });
 
-        it('stores return value in cache', function(done) {
+        it('should populate in cache from storage', function(done) {
             initHistory().then(
                 function(_) {
                     // TODO check CACHE for keys
@@ -59,7 +59,7 @@ describe('history', function () {
         });
     });
 
-    describe('#saveCacheToDisk', function() {
+    describe('#saveCacheToDisk()', function() {
         var fake, clock, timer;
 
         beforeEach(function() {
@@ -85,7 +85,7 @@ describe('history', function () {
             clock.restore();
         });
 
-        it('#startTimer saves incremental updates', function() {
+        it('should send interval updates to storage', function() {
             CACHE.set('key1', 'value1');
             clock.tick(10);
             sinon.assert.calledOnce(fake);
@@ -95,7 +95,7 @@ describe('history', function () {
             sinon.assert.calledTwice(fake);
         });
 
-        it('#stopTimer', function() {
+        it('should terminate interval updates', function() {
             stopTimer(timer);
             clock.runAll();
             CACHE.set('key1', 'value1');
@@ -104,7 +104,7 @@ describe('history', function () {
 
     });
 
-    describe('#handleBlockingEvent', function () {
+    describe('#handleBlockingEvent()', function () {
 
         var timeStamp, dateKey, testarray;
 
@@ -131,7 +131,7 @@ describe('history', function () {
         ];
 
         categoryTests.forEach((test) => {
-            it('#increment ' + test.cat + ' category',
+            it('should increment count of ' + test.cat + ' category',
                function() {
 
                    testarray[test.index] += 1;

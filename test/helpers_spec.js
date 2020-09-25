@@ -17,12 +17,12 @@ describe('testUtils', function () {
         };
     });
 
-    it('#merge() deep copies objects', function () {
+    it('#merge should create deep copies of objects', function () {
         expect(testUtils.merge(myObj, {})).to.deep.equal(myObj);
         expect(testUtils.merge({}, myObj)).to.deep.equal(myObj);
     });
 
-    it('#merge() combines two objects', function() {
+    it('#merge() should merge objects from L-to-R into new object', function() {
         var newObj = testUtils.merge(myObj, {
             a: 2,
             d: [4,5,6],

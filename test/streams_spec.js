@@ -20,28 +20,31 @@ describe('StreamController', function () {
         expect(streamController.isClosed()).to.be.true;
     });
 
-    it('#stream#listen() requires listener', function () {
-        expect(() => streamController.stream.listen()).to.throw(/Function required/);
+    describe('#stream', function () {
+
+        it('should throw error when not given function', function () {
+            expect(() => streamController.stream.listen()).to.throw(/Function required/);
+        });
+
+        it('should throw error when given invalid function', function () {
+            var invalidFn = function () {};
+            expect(() => streamController.stream.listen(invalidFn)).to.throw(/Listener/);
+        });
+
+        it('should throw error when listening on closed stream', function () {
+            streamController.close();
+            expect(() => streamController.stream.listen(function (_) {}))
+                .to.throw(/closed/);
+        });
+
+        it('should throw error when adding event to closed sink', function () {
+            streamController.close();
+            expect(() => streamController.sink.add({}))
+                .to.throw(/closed/);
+        });
     });
 
-    it('#stream#listen() requires valid listener', function () {
-        var invalidFn = function () {};
-        expect(() => streamController.stream.listen(invalidFn)).to.throw(/Listener/);
-    });
-
-    it('#close() stops stream#listen()', function () {
-        streamController.close();
-        expect(() => streamController.stream.listen(function (_) {}))
-            .to.throw(/closed/);
-    });
-
-    it('#close() stops sink#add()', function () {
-        streamController.close();
-        expect(() => streamController.sink.add({}))
-            .to.throw(/closed/);
-    });
-
-    it('#add() notifies listeners asynchronously', function (done) {
+    it('should notify listeners asynchronously', function (done) {
         var sink = streamController.sink,
             stream = streamController.stream;
 
@@ -60,7 +63,7 @@ describe('StreamController', function () {
         sink.add({type: 'blockedCookie', data: evtObj});
     });
 
-    it('#send() stores events until listeners are added', function (done) {
+    it('should buffer events until listeners are added', function (done) {
         var sink = streamController.sink,
             stream = streamController.stream;
 

@@ -24,7 +24,7 @@ describe('Storage', function() {
     // TODO https://www.chaijs.com/plugins/chai-as-promised/
 
     // Change the history argument to an immutable string "__CACHE__" or something...
-    it('#load() returns promise with history', function (done) {
+    it('should resolve promise supplying object from storage', function (done) {
         var dateKey = '1600646400000', // asDateKey(Date.now()),
             historyToday = {};
 
@@ -44,7 +44,7 @@ describe('Storage', function() {
             });
     });
 
-    it('#save() calls storage.set', function () {
+    it('should save object to storage', function () {
         Storage.save({});
         expect(setFake.calledOnce).to.be.true;
     });

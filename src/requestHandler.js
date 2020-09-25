@@ -1,4 +1,4 @@
-import { lookup, areEqual } from './services.js';
+import { lookup } from './services.js';
 
 // options
 const opts_allowThirdPartyCookies = false;
@@ -6,7 +6,7 @@ const opts_allowThirdPartyCookies = false;
 export const EventType = 'BlockedEvent';
 
 // TODO after refactoring, can we remove the state object arg all together?
-export function createRequestManager(svc, cfg) {
+export function createRequestHandler(svc, cfg) {
     if (!svc) throw Error('services not provided');
 
     const services = svc;
@@ -14,7 +14,7 @@ export function createRequestManager(svc, cfg) {
     const eventSink = (cfg && cfg['events']) ? cfg['events'] : undefined;
     const errorSink = (cfg && cfg['errors']) ? cfg['errors'] : undefined;
 
-    const requestManagerPrototype = {
+    const requestHandlerPrototype = {
         addTab: (info) => {
             const { tabId } = info;
             if(!state.hasOwnProperty(tabId)) {
@@ -277,7 +277,7 @@ export function createRequestManager(svc, cfg) {
         return areEqual(serviceDefinition, services[firstPartyService]);
     }
 
-    return Object.create(requestManagerPrototype);
+    return Object.create(requestHandlerPrototype);
 }
 
 
@@ -289,6 +289,13 @@ function BlockedEventData(req, count, category) {
         category: category,
         totalCount: count
     };
+}
+
+
+function areEqual(service1, service2) {
+    return (service1.name === service2.name
+            && service1.url === service2.url
+            && service1.category === service2.category);
 }
 
 
@@ -329,4 +336,4 @@ function stripHeaders(headers, name) {
     return didStrip ? res : undefined;
 }
 
-export { createRequestManager as default };
+export { createRequestHandler as default };
