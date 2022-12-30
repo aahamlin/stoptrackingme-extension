@@ -35,7 +35,7 @@
         "karma-mocha": "2.0.1",
         "karma-opera-launcher": "1.0.0",
         "karma-sinon": "1.0.5",
-        "mocha": "7.2.0",
+        "mocha": "10.2.0",
         "puppeteer": "^3.3.0",
         "sinon": "9.0.2",
         "webpack": "4.43.0",
